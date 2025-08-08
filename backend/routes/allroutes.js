@@ -1,0 +1,55 @@
+const express = require("express");
+const router = express.Router();
+const upload = require("../middleware/multer");
+const {handleUserlogin, handleUserSignup, handleForgotPassword, handleResetPassword} = require("../controller/auth")
+const {handleCreateUser, handleGetAllUsers, handleGetUserById, handleUpdateUser, handleUpdateProfile, handleGetCurrentUser, handleDeleteUser} = require("../controller/user")
+const {handleCreateProject, handleGetAllProjects, handleGetProjectById, handleUpdateProject, handleDeleteProject, handleAssignQA, handleAssignDevelopers} = require("../controller/project")
+const {handleCreateBug, handleGetAllBugs, handleGetBugById, handleUpdateBug, handleDeleteBug, handleUpdateBugStatus, handleReassignBug} = require("../controller/bug")
+const { 
+  authenticate, 
+  requireUser, 
+  requireManagerOrAdmin, 
+  requireAnyUser,
+  requireAdminManagerOrQA
+} = require("../middleware/authentication");
+
+//auth routes
+router.post("/signup", upload.single("picture"), handleUserSignup)
+router.post("/login", handleUserlogin);
+router.post("/forgot-password", handleForgotPassword);
+router.post("/reset-password", handleResetPassword);
+
+
+
+// User profile routes (for all authenticated users) - MUST come before /users/:userId
+router.get("/users/me", authenticate, handleGetCurrentUser);
+router.patch("/users/profile", authenticate, upload.single("picture"), handleUpdateProfile);
+
+// User routes
+router.post("/users", authenticate, requireAdminManagerOrQA, upload.single("picture"), handleCreateUser);
+router.get("/users", authenticate, requireAdminManagerOrQA, handleGetAllUsers);
+router.get("/users/:userId", authenticate, requireAdminManagerOrQA, handleGetUserById);
+router.patch("/users/:userId", authenticate, requireAdminManagerOrQA, upload.single("picture"), handleUpdateUser);
+router.delete("/users/:userId", authenticate, requireAdminManagerOrQA, handleDeleteUser);
+
+// Project management routes (only for managers , admins)
+router.post("/projects", authenticate, requireManagerOrAdmin, handleCreateProject);
+router.get("/projects", authenticate, requireManagerOrAdmin, handleGetAllProjects);
+router.get("/projects/:projectId", authenticate, requireManagerOrAdmin, handleGetProjectById);
+router.patch("/projects/:projectId", authenticate, requireManagerOrAdmin, handleUpdateProject);
+router.delete("/projects/:projectId", authenticate, requireManagerOrAdmin, handleDeleteProject);
+
+// Project assignment routes (only for managers , admins)
+router.post("/projects/:projectId/assign-qa", authenticate, requireManagerOrAdmin, handleAssignQA);
+router.post("/projects/:projectId/assign-developers", authenticate, requireManagerOrAdmin, handleAssignDevelopers);
+
+// Bug management routes (for QA, managers, admins, developers)
+router.post("/bugs", requireAnyUser, handleCreateBug);
+router.get("/bugs", requireAnyUser, handleGetAllBugs);
+router.get("/bugs/:bugId", requireAnyUser, handleGetBugById);
+router.patch("/bugs/:bugId", requireAnyUser, handleUpdateBug);
+router.delete("/bugs/:bugId", requireAnyUser, handleDeleteBug);
+router.patch("/bugs/:bugId/status", requireAnyUser, handleUpdateBugStatus);
+router.patch("/bugs/:bugId/reassign", requireAnyUser, handleReassignBug);
+
+module.exports = router; 
