@@ -6,9 +6,9 @@ import Login from './page/login';
 import Dashboard from './page/dashboard';
 import Projects from './page/projects';
 import ProjectDetails from './page/projects/[id]';
-import MyProjects from './page/projects/my-projects';
+import MyProjects from './page/projects/my-projects/index';
 import Users from './page/users';
-import Bugs from './page/bugs';
+import Bug from './page/bugs';
 import Profile from './page/profile';
 import NotFound from './feature/Error/Error';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -48,7 +48,7 @@ function App() {
         } />
         <Route path="/bugs" element={
           <ProtectedRoute>
-            <Bugs />
+            <Bug />
           </ProtectedRoute>
         } />
         <Route path="/profile" element={

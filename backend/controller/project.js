@@ -238,12 +238,7 @@ async function handleGetProjectById(req, res) {
     const { projectId } = req.params;
     
     // Use the user data from the middleware
-    const currentUser = req.managerOrAdminUser;
-    if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can view project details" 
-      });
-    }
+    const currentUser = req.currentUser;
 
     if (!projectId) {
       return res.status(400).json({ 

@@ -65,11 +65,25 @@ export const apiService = {
 
   // Project APIs
   getProjects: () => apiService.authenticatedRequest('/projects', { method: 'GET' }),
+  getProjectById: (projectId) => apiService.authenticatedRequest(`/projects/${projectId}`, { method: 'GET' }),
   createProject: (formData) => apiService.authenticatedRequest('/projects', { method: 'POST', body: formData }),
   updateProject: (projectId, formData) => apiService.authenticatedRequest(`/projects/${projectId}`, { method: 'PATCH', body: formData }),
   deleteProject: (projectId) => apiService.authenticatedRequest(`/projects/${projectId}`, { method: 'DELETE' }),
   assignQA: (projectId, qaIds) => apiService.authenticatedRequest(`/projects/${projectId}/assign-qa`, { method: 'POST', body: JSON.stringify({ qaIds }) }),
   assignDevelopers: (projectId, developerIds) => apiService.authenticatedRequest(`/projects/${projectId}/assign-developers`, { method: 'POST', body: JSON.stringify({ developerIds }) }),
+  getAssignedProjects: () => apiService.authenticatedRequest('/assigned-projects', { method: 'GET' }),
+  
+  // Bug APIs
+  getBugs: (projectId) => {
+    const endpoint = projectId ? `/bugs?projectId=${projectId}` : '/bugs';
+    return apiService.authenticatedRequest(endpoint, { method: 'GET' });
+  },
+  createBug: (formData) => apiService.authenticatedRequest('/bugs', { method: 'POST', body: formData }),
+  getBugById: (bugId) => apiService.authenticatedRequest(`/bugs/${bugId}`, { method: 'GET' }),
+  updateBug: (bugId, formData) => apiService.authenticatedRequest(`/bugs/${bugId}`, { method: 'PATCH', body: formData }),
+  deleteBug: (bugId) => apiService.authenticatedRequest(`/bugs/${bugId}`, { method: 'DELETE' }),
+  updateBugStatus: (bugId, status) => apiService.authenticatedRequest(`/bugs/${bugId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  reassignBug: (bugId, assignedTo) => apiService.authenticatedRequest(`/bugs/${bugId}/reassign`, { method: 'PATCH', body: JSON.stringify({ assignedTo }) }),
 };
 
 export default apiService;

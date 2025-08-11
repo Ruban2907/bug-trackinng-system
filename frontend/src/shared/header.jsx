@@ -86,12 +86,12 @@ const Header = () => {
               </>
             )}
             
-            {userInfo.role === 'qa' && (
+            {(userInfo.role === 'qa' || userInfo.role === 'developer') && (
               <button
-                onClick={() => navigate("/users")}
+                onClick={() => navigate("/my-projects")}
                 className="text-gray-700 hover:text-blue-600 transition-colors font-medium"
               >
-                Users
+                Projects
               </button>
             )}
             
@@ -158,12 +158,12 @@ const Header = () => {
             </>
           )}
           
-          {userInfo.role === 'qa' && (
+          {(userInfo.role === 'qa' || userInfo.role === 'developer') && (
             <button
-              onClick={() => navigate("/users")}
+              onClick={() => navigate("/my-projects")}
               className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
             >
-              Users
+              Projects
             </button>
           )}
           

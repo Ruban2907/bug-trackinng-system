@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import ConfirmationModal from '../../shared/ConfirmationModal';
+import { toast } from 'react-toastify';
 
-const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) => {
+const ProjectFormModal = ({ isOpen, onClose, onSubmit, project, qaUsers, developerUsers }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [qaAssigned, setQaAssigned] = useState([]);
@@ -11,50 +12,104 @@ const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) 
   const [showQASelection, setShowQASelection] = useState(false);
   const [showDevSelection, setShowDevSelection] = useState(false);
 
-  const qaUsers = users?.filter(u => u.role === 'qa') || [];
-  const devUsers = users?.filter(u => u.role === 'developer') || [];
-
+  // Use the passed qaUsers and developerUsers props directly
+  const qaUsersList = Array.isArray(qaUsers) ? qaUsers : [];
+  const devUsersList = Array.isArray(developerUsers) ? developerUsers : [];
+  
   useEffect(() => {
-    if (initialProject) {
-      console.log('Setting initial project data:', initialProject);
-      setName(initialProject.name || '');
-      setDescription(initialProject.description || '');
+    if (project) {
+      setName(project.name || '');
+      setDescription(project.description || '');
       // Handle both populated user objects and user IDs
-      const qaIds = initialProject.qaAssigned?.map(u => typeof u === 'object' ? u._id : u) || [];
-      const devIds = initialProject.developersAssigned?.map(u => typeof u === 'object' ? u._id : u) || [];
-      console.log('QA IDs:', qaIds, 'Dev IDs:', devIds);
+      const qaIds = Array.isArray(project.qaAssigned) 
+        ? project.qaAssigned.map(u => typeof u === 'object' ? u._id : u).filter(Boolean)
+        : [];
+      const devIds = Array.isArray(project.developersAssigned)
+        ? project.developersAssigned.map(u => typeof u === 'object' ? u._id : u).filter(Boolean)
+        : [];
       setQaAssigned(qaIds);
       setDevelopersAssigned(devIds);
-      setPictureFile(null);
     } else {
       setName('');
       setDescription('');
       setQaAssigned([]);
       setDevelopersAssigned([]);
-      setPictureFile(null);
     }
-  }, [initialProject]);
+  }, [project]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (project) {
+        // Edit mode - populate with existing data
+        setName(project.name || '');
+        setDescription(project.description || '');
+        // Handle both populated user objects and user IDs
+        const qaIds = Array.isArray(project.qaAssigned) 
+          ? project.qaAssigned.map(u => typeof u === 'object' ? u._id : u).filter(Boolean)
+          : [];
+        const devIds = Array.isArray(project.developersAssigned)
+          ? project.developersAssigned.map(u => typeof u === 'object' ? u._id : u).filter(Boolean)
+          : [];
+        setQaAssigned(qaIds);
+        setDevelopersAssigned(devIds);
+      } else {
+        // Create mode - clear form
+        setName('');
+        setDescription('');
+        setQaAssigned([]);
+        setDevelopersAssigned([]);
+      }
+    }
+  }, [isOpen, project]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!name || !name.trim()) {
+      toast.error('Project name is required');
+      return;
+    }
+    
+    // Validate that developers are not assigned without QA
+    if (developersAssigned && developersAssigned.length > 0 && 
+        (!qaAssigned || qaAssigned.length === 0)) {
+      toast.error('Developers cannot be assigned before QA team members');
+      return;
+    }
+    
     setIsLoading(true);
     try {
-             const formData = new FormData();
-       formData.append('name', name);
-       formData.append('description', description);
-       // Always send the arrays, even if empty, to ensure proper backend handling
-       formData.append('qaAssigned', JSON.stringify(qaAssigned));
-       formData.append('developersAssigned', JSON.stringify(developersAssigned));
-       if (pictureFile) formData.append('picture', pictureFile);
+      const formData = new FormData();
+      formData.append('name', name.trim());
+      formData.append('description', description.trim());
+      
+      // Ensure arrays are properly formatted for backend
+      const qaArray = Array.isArray(qaAssigned) ? qaAssigned.filter(Boolean) : [];
+      const devArray = Array.isArray(developersAssigned) ? developersAssigned.filter(Boolean) : [];
+      
+      formData.append('qaAssigned', JSON.stringify(qaArray));
+      formData.append('developersAssigned', JSON.stringify(devArray));
+      
+      if (pictureFile) formData.append('picture', pictureFile);
 
       await onSubmit(formData);
-      onClose();
+      // Don't close here - let the parent component handle closing after successful submission
+    } catch (error) {
+      console.error('Error in form submission:', error);
+      toast.error('Failed to submit form. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   if (!isOpen) return null;
+  
+  // Safety check for required props
+  if (!onClose || !onSubmit) {
+    console.error('ProjectFormModal: Missing required props');
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -62,16 +117,26 @@ const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) 
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
           <form onSubmit={handleSubmit} className="bg-white p-6 space-y-4">
-            <h3 className="text-lg font-semibold">{initialProject ? 'Edit Project' : 'Create Project'}</h3>
+            <h3 className="text-lg font-semibold">{project ? 'Edit Project' : 'Create Project'}</h3>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">Name</label>
-              <input value={name} onChange={e => setName(e.target.value)} required className="mt-1 w-full border rounded px-3 py-2" />
+              <input 
+                value={name || ''} 
+                onChange={e => setName(e.target.value || '')} 
+                required 
+                className="mt-1 w-full border rounded px-3 py-2" 
+              />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} className="mt-1 w-full border rounded px-3 py-2" rows={3} />
+              <textarea 
+                value={description || ''} 
+                onChange={e => setDescription(e.target.value || '')} 
+                className="mt-1 w-full border rounded px-3 py-2" 
+                rows={3} 
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -83,28 +148,26 @@ const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) 
                   <div className="mb-3">
                     <div className="text-xs font-medium text-gray-600 mb-2">Selected QA:</div>
                     <div className="flex flex-wrap gap-2">
-                      {qaAssigned.map(qaId => {
-                        const user = qaUsers.find(u => u._id === qaId);
-                        return user ? (
-                          <div key={qaId} className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-                            <span>{user.firstname} {user.lastname}</span>
-                                                         <button
-                               type="button"
-                               onClick={() => {
-                                 console.log('Removing QA:', qaId, 'Current:', qaAssigned);
-                                 setQaAssigned(prev => {
-                                   const newArray = prev.filter(id => id !== qaId);
-                                   console.log('New QA array:', newArray);
-                                   return newArray;
-                                 });
-                               }}
-                               className="text-blue-600 hover:text-blue-800"
-                             >
-                               ×
-                             </button>
-                          </div>
-                        ) : null;
-                      })}
+                                                                      {qaAssigned.filter(Boolean).map(qaId => {
+                          const user = qaUsersList.find(u => u && u._id === qaId);
+                          return user ? (
+                            <div key={qaId} className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                              <span>{user.firstname || 'Unknown'} {user.lastname || 'User'}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setQaAssigned(prev => {
+                                    const newArray = prev.filter(id => id !== qaId);
+                                    return newArray;
+                                  });
+                                }}
+                                className="text-blue-600 hover:text-blue-800"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : null;
+                        })}
                     </div>
                   </div>
                 )}
@@ -127,25 +190,29 @@ const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) 
                         <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
                           <h3 className="text-lg font-medium text-gray-900 mb-4">Select QA Engineers</h3>
                           <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {qaUsers.map(user => (
-                              <label key={user._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
-                                <input
-                                  type="checkbox"
-                                  checked={qaAssigned.includes(user._id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setQaAssigned(prev => [...prev, user._id]);
-                                    } else {
-                                      setQaAssigned(prev => prev.filter(id => id !== user._id));
-                                    }
-                                  }}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm">
-                                  {user.firstname} {user.lastname} ({user.email})
-                                </span>
-                              </label>
-                            ))}
+                            {qaUsersList.length > 0 ? (
+                              qaUsersList.filter(user => user && user._id).map(user => (
+                                <label key={user._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={qaAssigned.includes(user._id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setQaAssigned(prev => [...prev, user._id]);
+                                      } else {
+                                        setQaAssigned(prev => prev.filter(id => id !== user._id));
+                                      }
+                                    }}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="text-sm">
+                                    {user.firstname || 'Unknown'} {user.lastname || 'User'} ({user.email || 'No email'})
+                                  </span>
+                                </label>
+                              ))
+                            ) : (
+                              <div className="text-gray-500 text-sm p-2">No QA users available</div>
+                            )}
                           </div>
                         </div>
                         <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
@@ -171,28 +238,26 @@ const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) 
                   <div className="mb-3">
                     <div className="text-xs font-medium text-gray-600 mb-2">Selected Developers:</div>
                     <div className="flex flex-wrap gap-2">
-                      {developersAssigned.map(devId => {
-                        const user = devUsers.find(u => u._id === devId);
-                        return user ? (
-                          <div key={devId} className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
-                            <span>{user.firstname} {user.lastname}</span>
-                                                         <button
-                               type="button"
-                               onClick={() => {
-                                 console.log('Removing Developer:', devId, 'Current:', developersAssigned);
-                                 setDevelopersAssigned(prev => {
-                                   const newArray = prev.filter(id => id !== devId);
-                                   console.log('New Developers array:', newArray);
-                                   return newArray;
-                                 });
-                               }}
-                               className="text-green-600 hover:text-green-800"
-                             >
-                               ×
-                             </button>
-                          </div>
-                        ) : null;
-                      })}
+                                                                      {developersAssigned.filter(Boolean).map(devId => {
+                          const user = devUsersList.find(u => u && u._id === devId);
+                          return user ? (
+                            <div key={devId} className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                              <span>{user.firstname || 'Unknown'} {user.lastname || 'User'}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDevelopersAssigned(prev => {
+                                    const newArray = prev.filter(id => id !== devId);
+                                    return newArray;
+                                  });
+                                }}
+                                className="text-green-600 hover:text-green-800"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : null;
+                        })}
                     </div>
                   </div>
                 )}
@@ -215,25 +280,29 @@ const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) 
                         <div className="bg-white px-4 pt-5 pb-4 sm:p-6">
                           <h3 className="text-lg font-medium text-gray-900 mb-4">Select Developers</h3>
                           <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {devUsers.map(user => (
-                              <label key={user._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
-                                <input
-                                  type="checkbox"
-                                  checked={developersAssigned.includes(user._id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setDevelopersAssigned(prev => [...prev, user._id]);
-                                    } else {
-                                      setDevelopersAssigned(prev => prev.filter(id => id !== user._id));
-                                    }
-                                  }}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="text-sm">
-                                  {user.firstname} {user.lastname} ({user.email})
-                                </span>
-                              </label>
-                            ))}
+                            {devUsersList.length > 0 ? (
+                              devUsersList.filter(user => user && user._id).map(user => (
+                                <label key={user._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={developersAssigned.includes(user._id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setDevelopersAssigned(prev => [...prev, user._id]);
+                                      } else {
+                                        setDevelopersAssigned(prev => prev.filter(id => id !== user._id));
+                                      }
+                                    }}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="text-sm">
+                                    {user.firstname || 'Unknown'} {user.lastname || 'User'} ({user.email || 'No email'})
+                                  </span>
+                                </label>
+                              ))
+                            ) : (
+                              <div className="text-gray-500 text-sm p-2">No developer users available</div>
+                            )}
                           </div>
                         </div>
                         <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
@@ -254,13 +323,28 @@ const ProjectFormModal = ({ isOpen, onClose, onSubmit, initialProject, users }) 
 
             <div>
               <label className="block text-sm font-medium text-gray-700">Project Picture (optional)</label>
+              {project?.picture?.data && project?.picture?.contentType && (
+                <div className="mb-2">
+                  <p className="text-sm text-gray-600 mb-2">Current picture:</p>
+                  <img 
+                    src={`data:${project.picture.contentType};base64,${project.picture.data}`} 
+                    alt="Current project picture" 
+                    className="w-32 h-32 object-cover rounded border"
+                    onError={(e) => {
+                      console.error('Failed to load project picture');
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
               <input type="file" accept="image/*" onChange={e => setPictureFile(e.target.files?.[0] || null)} className="mt-1" />
+              <p className="text-xs text-gray-500 mt-1">Leave empty to keep current picture, or select a new one</p>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={onClose} className="px-4 py-2 rounded border">Cancel</button>
               <button type="submit" disabled={isLoading} className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50">
-                {isLoading ? 'Saving...' : (initialProject ? 'Save Changes' : 'Create')}
+                {isLoading ? 'Saving...' : (project ? 'Save Changes' : 'Create')}
               </button>
             </div>
           </form>

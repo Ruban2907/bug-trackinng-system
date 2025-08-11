@@ -35,7 +35,7 @@ router.delete("/users/:userId", authenticate, requireAdminManagerOrQA, handleDel
 // Project management routes (only for managers , admins)
 router.post("/projects", authenticate, requireManagerOrAdmin, upload.single("picture"), handleCreateProject);
 router.get("/projects", authenticate, requireManagerOrAdmin, handleGetAllProjects);
-router.get("/projects/:projectId", authenticate, requireManagerOrAdmin, handleGetProjectById);
+router.get("/projects/:projectId", authenticate, requireAnyUser, handleGetProjectById);
 router.patch("/projects/:projectId", authenticate, requireManagerOrAdmin, upload.single("picture"), handleUpdateProject);
 router.delete("/projects/:projectId", authenticate, requireManagerOrAdmin, handleDeleteProject);
 
@@ -47,12 +47,12 @@ router.post("/projects/:projectId/assign-qa", authenticate, requireManagerOrAdmi
 router.post("/projects/:projectId/assign-developers", authenticate, requireManagerOrAdmin, handleAssignDevelopers);
 
 // Bug management routes (for QA, managers, admins, developers)
-router.post("/bugs", requireAnyUser, handleCreateBug);
-router.get("/bugs", requireAnyUser, handleGetAllBugs);
-router.get("/bugs/:bugId", requireAnyUser, handleGetBugById);
-router.patch("/bugs/:bugId", requireAnyUser, handleUpdateBug);
-router.delete("/bugs/:bugId", requireAnyUser, handleDeleteBug);
-router.patch("/bugs/:bugId/status", requireAnyUser, handleUpdateBugStatus);
-router.patch("/bugs/:bugId/reassign", requireAnyUser, handleReassignBug);
+router.post("/bugs", authenticate, requireAnyUser, upload.single("screenshot"), handleCreateBug);
+router.get("/bugs", authenticate, requireAnyUser, handleGetAllBugs);
+router.get("/bugs/:bugId", authenticate, requireAnyUser, handleGetBugById);
+router.patch("/bugs/:bugId", authenticate, requireAnyUser, upload.single("screenshot"), handleUpdateBug);
+router.delete("/bugs/:bugId", authenticate, requireAnyUser, handleDeleteBug);
+router.patch("/bugs/:bugId/status", authenticate, requireAnyUser, handleUpdateBugStatus);
+router.patch("/bugs/:bugId/reassign", authenticate, requireAnyUser, handleReassignBug);
 
 module.exports = router; 

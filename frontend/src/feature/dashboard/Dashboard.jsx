@@ -51,6 +51,8 @@ const DashboardPage = () => {
             totalProjects: projectsData.projects?.length || 0
           }));
         }
+        
+
       }
       
       // Fetch assigned projects count for QA and developers
@@ -67,24 +69,38 @@ const DashboardPage = () => {
         }
       }
       
-      // Fetch bugs count
-      const bugsRes = await apiService.authenticatedRequest('/bugs');
-      if (bugsRes.ok) {
-        const bugsData = await bugsRes.json();
-        const bugs = bugsData.bugs || [];
-        
-        // Count different bug statuses
-        const activeBugs = bugs.filter(bug => bug.status === 'open' || bug.status === 'in-progress').length;
-        const resolvedIssues = bugs.filter(bug => bug.status === 'resolved').length;
-        const pendingFeatures = bugs.filter(bug => bug.type === 'feature' && bug.status !== 'resolved').length;
-        
-        setDashboardStats(prev => ({
-          ...prev,
-          activeBugs,
-          pendingFeatures,
-          resolvedIssues
-        }));
+      // Fetch bugs count based on user role and access
+      let bugs = [];
+      
+      if (userInfo.role === 'admin' || userInfo.role === 'manager') {
+        // Admins and managers can see all bugs
+        const bugsRes = await apiService.authenticatedRequest('/bugs');
+        if (bugsRes.ok) {
+          const bugsData = await bugsRes.json();
+          bugs = bugsData.bugs || [];
+        }
+      } else {
+        // QA and developers can only see bugs from their assigned projects
+        const bugsRes = await apiService.authenticatedRequest('/bugs');
+        if (bugsRes.ok) {
+          const bugsData = await bugsRes.json();
+          bugs = bugsData.bugs || [];
+        }
       }
+      
+      // Count different bug statuses
+      const activeBugs = bugs.filter(bug => bug.status === 'new' || bug.status === 'started').length;
+      const resolvedIssues = bugs.filter(bug => bug.status === 'resolved' || bug.status === 'completed').length;
+      const pendingFeatures = bugs.filter(bug => bug.type === 'feature' && bug.status !== 'completed').length;
+      
+
+      
+      setDashboardStats(prev => ({
+        ...prev,
+        activeBugs,
+        pendingFeatures,
+        resolvedIssues
+      }));
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       toast.error('Failed to load dashboard statistics');
@@ -182,7 +198,7 @@ const DashboardPage = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {(userInfo.role === 'admin' || userInfo.role === 'manager') ? (
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-blue-900">Total Projects</h3>
@@ -198,21 +214,33 @@ const DashboardPage = () => {
           )}
           
           <div className="bg-green-50 p-4 rounded-lg">
-            <h3 className="text-lg font-medium text-green-900">Active Bugs</h3>
+            <h3 className="text-lg font-medium text-green-900">
+              {userInfo.role === 'developer' ? 'My Active Bugs' : 'Active Bugs'}
+            </h3>
             <p className="text-2xl font-bold text-green-600">{dashboardStats.activeBugs}</p>
-            <p className="text-xs text-green-600 mt-1">Open & in-progress bugs</p>
+            <p className="text-xs text-green-600 mt-1">
+                              {userInfo.role === 'developer' ? 'Bugs assigned to you' : 'New & started bugs'}
+            </p>
           </div>
           
           <div className="bg-yellow-50 p-4 rounded-lg">
-            <h3 className="text-lg font-medium text-yellow-900">Pending Features</h3>
+            <h3 className="text-lg font-medium text-yellow-900">
+              {userInfo.role === 'developer' ? 'My Pending Features' : 'Pending Features'}
+            </h3>
             <p className="text-2xl font-bold text-yellow-600">{dashboardStats.pendingFeatures}</p>
-            <p className="text-xs text-yellow-600 mt-1">Unresolved feature requests</p>
+            <p className="text-xs text-yellow-600 mt-1">
+              {userInfo.role === 'developer' ? 'Features assigned to you' : 'Unresolved feature requests'}
+            </p>
           </div>
           
           <div className="bg-purple-50 p-4 rounded-lg">
-            <h3 className="text-lg font-medium text-purple-900">Resolved Issues</h3>
+            <h3 className="text-lg font-medium text-purple-900">
+              {userInfo.role === 'developer' ? 'My Resolved Issues' : 'Resolved Issues'}
+            </h3>
             <p className="text-2xl font-bold text-purple-600">{dashboardStats.resolvedIssues}</p>
-            <p className="text-xs text-purple-600 mt-1">Completed bugs & features</p>
+            <p className="text-xs text-purple-600 mt-1">
+              {userInfo.role === 'developer' ? 'Issues you resolved' : 'Completed bugs & features'}
+            </p>
           </div>
         </div>
 
@@ -237,20 +265,12 @@ const DashboardPage = () => {
             )}
             
             {userInfo.role === 'qa' && (
-              <>
-                <button 
-                  onClick={() => navigate("/users")}
-                  className="bg-green-600 text-white p-4 rounded-lg hover:bg-green-700 transition"
-                >
-                  Manage Users
-                </button>
-                <button 
-                  onClick={() => navigate("/my-projects")}
-                  className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 transition"
-                >
-                  Show My Projects
-                </button>
-              </>
+              <button 
+                onClick={() => navigate("/my-projects")}
+                className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 transition"
+              >
+                Show My Projects
+              </button>
             )}
             
             {userInfo.role === 'developer' && (
@@ -262,44 +282,127 @@ const DashboardPage = () => {
               </button>
             )}
             
-            <button 
-              onClick={() => navigate("/bugs")}
-              className="bg-orange-600 text-white p-4 rounded-lg hover:bg-orange-700 transition"
-            >
-              Create Bug/Feature
-            </button>
+                         <button 
+               onClick={() => navigate("/bugs")}
+               className="bg-orange-600 text-white p-4 rounded-lg hover:bg-orange-700 transition"
+             >
+               {userInfo.role === 'developer' ? 'Bug/Feature' : 'Create Bug/Feature'}
+             </button>
           </div>
         </div>
 
-        {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">User Management</h4>
-            <p className="text-sm text-blue-700">
-              As an {userInfo.role}, you can create new user accounts and manage existing users through the "Manage Users" feature. 
-              New users will be able to login with their credentials once created.
-            </p>
-          </div>
-        )}
+        {/* Role-based Actions Summary */}
+        <div className="mt-8 p-6 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions You Can Perform</h3>
+          
+          {userInfo.role === 'admin' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">🔧 System Management</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• Create, edit, and delete projects</li>
+                    <li>• Assign QA engineers and developers to projects</li>
+                    <li>• Manage all user accounts (create, edit, delete)</li>
+                    <li>• Access all projects and bugs in the system</li>
+                    <li>• Full control over user roles and permissions</li>
+                  </ul>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">🐛 Bug & Feature Management</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• Create, edit, and delete bugs/features</li>
+                    <li>• Update bug statuses and reassign bugs</li>
+                    <li>• View all project screenshots and details</li>
+                    <li>• Monitor overall system performance</li>
+                    <li>• Access comprehensive project analytics</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {userInfo.role === 'qa' && (
-          <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h4 className="text-sm font-medium text-green-900 mb-2">User Management</h4>
-            <p className="text-sm text-green-700">
-              As a QA Engineer, you can view developer accounts through the "Manage Users" feature. 
-              You can see developer information but cannot create, edit, or delete developer accounts.
-            </p>
-          </div>
-        )}
+          {userInfo.role === 'manager' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">📋 Project Management</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• Create, edit, and delete projects</li>
+                    <li>• Assign QA engineers and developers to projects</li>
+                    <li>• Manage project assignments and team composition</li>
+                    <li>• View all projects and their current status</li>
+                    <li>• Monitor project progress and team performance</li>
+                  </ul>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">🐛 Bug & Feature Management</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• Create, edit, and delete bugs/features</li>
+                    <li>• Update bug statuses and reassign bugs</li>
+                    <li>• View all project screenshots and details</li>
+                    <li>• Track bug resolution progress</li>
+                    <li>• Manage feature development workflow</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {userInfo.role === 'developer' && (
-          <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Developer Dashboard</h4>
-            <p className="text-sm text-gray-700">
-              As a developer, you can view and update bug statuses assigned to you. 
-              Use the navigation menu to access projects and bugs.
-            </p>
-          </div>
-        )}
+          {userInfo.role === 'qa' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">🔍 Quality Assurance</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• View projects assigned to you</li>
+                    <li>• Create and manage bugs/features</li>
+                    <li>• Update bug statuses and descriptions</li>
+                    <li>• Upload and manage bug screenshots</li>
+                    <li>• Track bug resolution progress</li>
+                  </ul>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">📊 Project Monitoring</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• Access "My Projects" to see assigned work</li>
+                    <li>• View detailed project information</li>
+                    <li>• Monitor bug counts and project status</li>
+                    <li>• Collaborate with developers on bug fixes</li>
+                    <li>• Manage feature request workflows</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {userInfo.role === 'developer' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">💻 Development Work</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• View projects assigned to you</li>
+                    <li>• Update bug and feature statuses</li>
+                    <li>• Track your assigned work progress</li>
+                    <li>• View bug details and screenshots</li>
+                    <li>• Monitor project deadlines and priorities</li>
+                  </ul>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-900 mb-2">📈 Progress Tracking</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    <li>• Access "My Projects" for assigned work</li>
+                    <li>• Update bug status: New → Started → Resolved</li>
+                    <li>• Update feature status: New → Started → Completed</li>
+                    <li>• View project team composition</li>
+                    <li>• Track your development metrics</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );

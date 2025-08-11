@@ -3,35 +3,61 @@ import Layout from '../../../shared/Layout';
 import { apiService } from '../../../services/api';
 import { toast } from 'react-toastify';
 import ProjectCard from '../../../feature/projects/ProjectCard';
-import { useNavigate } from 'react-router-dom';
+import BugEditModal from '../../../feature/bugs/BugEditModal';
+import BugCard from '../../../feature/bugs/BugCard';
+import ConfirmationModal from '../../../shared/ConfirmationModal';
 import { getUserInfo } from '../../../utils/userUtils';
+import { useNavigate } from 'react-router-dom';
 
 const MyProjects = () => {
   const [projects, setProjects] = useState([]);
+  const [projectBugs, setProjectBugs] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [bugToEdit, setBugToEdit] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [bugToDelete, setBugToDelete] = useState(null);
+  const [deletingBug, setDeletingBug] = useState(null);
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [bugToReassign, setBugToReassign] = useState(null);
+  const [reassigningBug, setReassigningBug] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const user = getUserInfo();
     if (user) {
       setUserInfo(user);
+      // Only QA and developers should access this page
+      if (user.role === 'admin' || user.role === 'manager') {
+        // Redirect to main projects page
+        navigate('/projects', { replace: true });
+        return;
+      }
     }
-  }, []);
+  }, [navigate]);
 
-    const fetchMyProjects = async () => {
-    if (!userInfo) return;
-    
+  useEffect(() => {
+    if (userInfo) {
+      fetchData();
+    }
+  }, [userInfo]);
+
+  const fetchData = async () => {
     setIsLoading(true);
     try {
-      const projectsRes = await apiService.authenticatedRequest('/assigned-projects');
-      const projectsData = await projectsRes.json();
-      
+      const projectsRes = await apiService.getAssignedProjects();
       if (!projectsRes.ok) {
-        throw new Error(projectsData.message || 'Failed to load projects');
+        const errorData = await projectsRes.json();
+        throw new Error(errorData.message || 'Failed to load projects');
       }
 
-      setProjects(projectsData.projects || []);
+      const projectsData = await projectsRes.json();
+      const projectsList = projectsData.projects || [];
+      setProjects(projectsList);
+      
+      // Fetch bugs for each project
+      await fetchProjectBugs(projectsList);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -39,21 +65,208 @@ const MyProjects = () => {
     }
   };
 
-  useEffect(() => {
-    if (userInfo) {
-      fetchMyProjects();
-    }
-  }, [userInfo]);
+  const fetchProjectBugs = async (projectsList) => {
+    try {
+      const bugsPromises = projectsList.map(async (project) => {
+        try {
+          const bugsRes = await apiService.authenticatedRequest(`/bugs?projectId=${project._id}`);
+          if (bugsRes.ok) {
+            const bugsData = await bugsRes.json();
+            return { projectId: project._id, bugs: bugsData.bugs || [] };
+          }
+        } catch (error) {
+          console.error(`Error fetching bugs for project ${project._id}:`, error);
+        }
+        return { projectId: project._id, bugs: [] };
+      });
 
-  const handleShowDetails = (project) => {
-    navigate(`/projects/${project._id}`);
+      const bugsResults = await Promise.all(bugsPromises);
+      const bugsMap = {};
+      bugsResults.forEach(result => {
+        bugsMap[result.projectId] = result.bugs;
+      });
+      setProjectBugs(bugsMap);
+    } catch (error) {
+      console.error('Error fetching project bugs:', error);
+    }
   };
 
+  const handleBugEdit = (bug) => {
+    setBugToEdit(bug);
+    setShowEditModal(true);
+  };
+
+  const handleBugEditClose = () => {
+    setShowEditModal(false);
+    setBugToEdit(null);
+  };
+
+  const handleBugUpdated = (updatedBug) => {
+    // Update the bug in the projectBugs state
+    setProjectBugs(prev => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach(projectId => {
+        newState[projectId] = newState[projectId].map(bug => 
+          bug._id === updatedBug._id ? updatedBug : bug
+        );
+      });
+      return newState;
+    });
+    toast.success('Bug updated successfully');
+  };
+
+  const handleBugDelete = (bug) => {
+    setBugToDelete(bug);
+    setShowDeleteModal(true);
+  };
+
+  const handleBugDeleteConfirm = async () => {
+    if (!bugToDelete) return;
+    
+    setDeletingBug(bugToDelete._id);
+    try {
+      const res = await apiService.deleteBug(bugToDelete._id);
+      const data = await res.json();
+      
+      if (!res.ok) {
+        toast.error(data.message || 'Failed to delete bug');
+      } else {
+        toast.success('Bug deleted successfully');
+        // Remove the bug from projectBugs state
+        setProjectBugs(prev => {
+          const newState = { ...prev };
+          Object.keys(newState).forEach(projectId => {
+            newState[projectId] = newState[projectId].filter(bug => bug._id !== bugToDelete._id);
+          });
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting bug:', error);
+      toast.error('Failed to delete bug');
+    } finally {
+      setDeletingBug(null);
+      setShowDeleteModal(false);
+      setBugToDelete(null);
+    }
+  };
+
+  const handleBugDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setBugToDelete(null);
+  };
+
+  const handleBugReassign = (bug) => {
+    setBugToReassign(bug);
+    setShowReassignModal(true);
+  };
+
+  const handleBugReassignConfirm = async (newAssignee) => {
+    if (!bugToReassign) return;
+    
+    setReassigningBug(bugToReassign._id);
+    try {
+      const res = await apiService.reassignBug(bugToReassign._id, newAssignee);
+      const data = await res.json();
+      
+      if (!res.ok) {
+        toast.error(data.message || 'Failed to reassign bug');
+      } else {
+        toast.success('Bug reassigned successfully');
+        // Update the bug in projectBugs state
+        setProjectBugs(prev => {
+          const newState = { ...prev };
+          Object.keys(newState).forEach(projectId => {
+            newState[projectId] = newState[projectId].map(bug => 
+              bug._id === bugToReassign._id ? { ...bug, assignedTo: newAssignee } : bug
+            );
+          });
+          return newState;
+        });
+        setShowReassignModal(false);
+        setBugToReassign(null);
+      }
+    } catch (error) {
+      console.error('Error reassigning bug:', error);
+      toast.error('Failed to reassign bug');
+    } finally {
+      setReassigningBug(null);
+    }
+  };
+
+  const handleBugReassignCancel = () => {
+    setShowReassignModal(false);
+    setBugToReassign(null);
+  };
+
+  // Inline reassign handler for BugCard (used by QA view)
+  const handleInlineReassign = async (bugId, newAssignee) => {
+    if (!bugId || !newAssignee) return;
+    setReassigningBug(bugId);
+    try {
+      const res = await apiService.reassignBug(bugId, newAssignee);
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || 'Failed to reassign bug');
+      } else {
+        toast.success('Bug reassigned successfully');
+        setProjectBugs(prev => {
+          const newState = { ...prev };
+          Object.keys(newState).forEach(projectId => {
+            newState[projectId] = newState[projectId].map(bug =>
+              bug._id === bugId ? { ...bug, assignedTo: data?.bug?.assignedTo || newAssignee } : bug
+            );
+          });
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error('Error reassigning bug:', error);
+      toast.error('Failed to reassign bug');
+    } finally {
+      setReassigningBug(null);
+    }
+  };
+
+  const handleStatusUpdate = async (bugId, newStatus) => {
+    try {
+      const response = await apiService.updateBugStatus(bugId, newStatus);
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast.success('Bug status updated successfully');
+        // Update the bug in projectBugs state
+        setProjectBugs(prev => {
+          const newState = { ...prev };
+          Object.keys(newState).forEach(projectId => {
+            newState[projectId] = newState[projectId].map(bug => 
+              bug._id === bugId ? { ...bug, status: newStatus } : bug
+            );
+          });
+          return newState;
+        });
+      } else {
+        toast.error(data.message || 'Failed to update bug status');
+      }
+    } catch (error) {
+      console.error('Error updating bug status:', error);
+      toast.error('Failed to update bug status');
+    }
+  };
+
+  // Show loading while checking user role
   if (!userInfo) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
+      <Layout>
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-center py-12">
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="text-lg text-gray-600">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </Layout>
     );
   }
 
@@ -64,75 +277,120 @@ const MyProjects = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => window.history.back()}
               className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              <span className="font-medium">Back to Dashboard</span>
+              <span className="font-medium">Back</span>
             </button>
             <div className="h-6 w-px bg-gray-300"></div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">My Projects</h1>
-              <p className="text-gray-600 mt-1">
-                {userInfo.role === 'qa' 
-                  ? 'Projects where you are assigned as QA Engineer'
-                  : 'Projects where you are assigned as Developer'
-                }
-              </p>
+              <p className="text-gray-600 mt-1">View your assigned projects and manage bugs.</p>
             </div>
           </div>
-          <button 
-            onClick={fetchMyProjects}
-            className="px-4 py-2 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-          >
-            Refresh
-          </button>
         </div>
       </div>
 
       {isLoading ? (
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-center py-12">
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="text-lg text-gray-600">Loading your projects...</span>
-            </div>
-          </div>
+          <div className="flex items-center"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div><span className="ml-2">Loading...</span></div>
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                     {projects.map(project => (
-             <ProjectCard 
-               key={project._id} 
-               project={project} 
-               onShowDetails={handleShowDetails}
-               showEditDelete={false} // Don't show edit/delete buttons for assigned users
-               showDetails={false} // Don't show details button for assigned users
-             />
-           ))}
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {projects.map(project => (
+            <div key={project._id} className="bg-white rounded-lg shadow p-6">
+              <ProjectCard 
+                project={project} 
+                showEditDelete={false}
+                showDetails={false}
+                bugsCount={projectBugs[project._id]?.length || 0}
+              />
+              
+              {/* Project Bugs Section */}
+              {projectBugs[project._id] && projectBugs[project._id].length > 0 && (
+                <div className="mt-6 border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Bugs</h3>
+                  
+                  <div className="space-y-4">
+                    {projectBugs[project._id].map(bug => (
+                      userInfo.role === 'qa' ? (
+                        <BugCard
+                          key={bug._id}
+                          bug={bug}
+                          onEdit={handleBugEdit}
+                          onDelete={handleBugDelete}
+                          onStatusUpdate={handleStatusUpdate}
+                          onReassign={handleInlineReassign}
+                        />
+                      ) : userInfo.role === 'developer' ? (
+                        <BugCard
+                          key={bug._id}
+                          bug={bug}
+                          onEdit={null}
+                          onDelete={null}
+                          onStatusUpdate={handleStatusUpdate}
+                          onReassign={null}
+                        />
+                      ) : (
+                        <BugCard
+                          key={bug._id}
+                          bug={bug}
+                          onEdit={handleBugEdit}
+                          onDelete={handleBugDelete}
+                          onStatusUpdate={handleStatusUpdate}
+                          onReassign={handleBugReassign}
+                        />
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          
           {projects.length === 0 && (
-            <div className="bg-white rounded-lg shadow p-6 text-center">
-              <div className="text-gray-400 text-6xl mb-4">
-                {userInfo.role === 'qa' ? '🔍' : '💻'}
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No Projects Assigned
-              </h3>
-              <p className="text-gray-600">
-                {userInfo.role === 'qa' 
-                  ? 'You are not currently assigned to any projects as a QA Engineer.'
-                  : 'You are not currently assigned to any projects as a Developer.'
-                }
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Contact your project manager to get assigned to projects.
-              </p>
+            <div className="bg-white rounded-lg shadow p-6 text-center text-gray-600">
+              <p className="text-lg">No projects assigned to you yet.</p>
+              <p className="text-sm mt-2">Contact your manager to get assigned to projects.</p>
             </div>
           )}
         </div>
       )}
+
+      {/* Bug Edit Modal */}
+      <BugEditModal
+        isOpen={showEditModal}
+        onClose={handleBugEditClose}
+        bug={bugToEdit}
+        onBugUpdated={handleBugUpdated}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={handleBugDeleteCancel}
+        onConfirm={handleBugDeleteConfirm}
+        title="Delete Bug"
+        message={bugToDelete ? `Are you sure you want to delete "${bugToDelete.title}"? This action cannot be undone.` : ''}
+        confirmText="Delete Bug"
+        cancelText="Cancel"
+        isLoading={deletingBug !== null}
+      />
+
+      {/* Reassign Modal */}
+      <ConfirmationModal
+        isOpen={showReassignModal}
+        onClose={handleBugReassignCancel}
+        onConfirm={() => handleBugReassignConfirm(bugToReassign?.assignedTo?._id || '')}
+        title="Reassign Bug"
+        message={bugToReassign ? `Are you sure you want to reassign "${bugToReassign.title}"?` : ''}
+        confirmText="Reassign"
+        cancelText="Cancel"
+        isLoading={reassigningBug !== null}
+      />
     </Layout>
   );
 };

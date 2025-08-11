@@ -2,6 +2,18 @@ const Bug = require("../model/bug");
 const Project = require("../model/project");
 const User = require("../model/user");
 
+// Helper function to serialize bug data for JSON response
+function serializeBug(bug) {
+  const bugObj = bug.toObject();
+  
+  // Convert Buffer to base64 for screenshot
+  if (bugObj.screenshot && bugObj.screenshot.data) {
+    bugObj.screenshot.data = bugObj.screenshot.data.toString('base64');
+  }
+  
+  return bugObj;
+}
+
 async function handleCreateBug(req, res) {
   try {
     const { title, type, status, description, deadline, projectId, assignedTo } = req.body;
@@ -104,7 +116,7 @@ async function handleCreateBug(req, res) {
 
     return res.status(201).json({ 
       message: 'Bug/Feature created successfully', 
-      bug: newBug 
+      bug: serializeBug(newBug)
     });
   } catch (error) {
     console.error("Create bug error:", error);
@@ -171,11 +183,15 @@ async function handleGetAllBugs(req, res) {
       .populate('createdBy', 'firstname lastname email role')
       .populate('assignedTo', 'firstname lastname email role')
       .populate('projectId', 'name')
+      .select('+screenshot')
       .sort({ createdAt: -1 });
+    
+    // Serialize bugs to convert Buffer data to base64
+    const serializedBugs = bugs.map(bug => serializeBug(bug));
     
     return res.status(200).json({ 
       message: 'Bugs retrieved successfully', 
-      bugs: bugs 
+      bugs: serializedBugs 
     });
   } catch (error) {
     console.error("Get all bugs error:", error);
@@ -226,7 +242,7 @@ async function handleGetBugById(req, res) {
 
     return res.status(200).json({ 
       message: 'Bug retrieved successfully', 
-      bug: bug 
+      bug: serializeBug(bug)
     });
   } catch (error) {
     console.error("Get bug by ID error:", error);
@@ -237,7 +253,7 @@ async function handleGetBugById(req, res) {
 async function handleUpdateBug(req, res) {
   try {
     const { bugId } = req.params;
-    const { title, type, status, description, deadline } = req.body;
+    const { title, type, status, description, deadline, assignedTo } = req.body;
     
     const currentUser = req.currentUser;
     if (!currentUser) {
@@ -289,6 +305,22 @@ async function handleUpdateBug(req, res) {
       if (description !== undefined) bug.description = description;
       if (deadline !== undefined) bug.deadline = deadline;
 
+      // Handle reassignment if provided
+      if (assignedTo) {
+        // Verify the new assignee is a developer in the project
+        const isDeveloperInProject = project.developersAssigned.some(
+          dev => dev._id.toString() === assignedTo
+        );
+        
+        if (!isDeveloperInProject) {
+          return res.status(400).json({ 
+            message: "Assigned developer must be part of this project" 
+          });
+        }
+        
+        bug.assignedTo = assignedTo;
+      }
+
       if (req.file) {
         bug.screenshot = {
           data: req.file.buffer,
@@ -307,7 +339,7 @@ async function handleUpdateBug(req, res) {
 
     return res.status(200).json({ 
       message: 'Bug updated successfully', 
-      bug: bug 
+      bug: serializeBug(bug)
     });
   } catch (error) {
     console.error("Update bug error:", error);
@@ -421,7 +453,7 @@ async function handleUpdateBugStatus(req, res) {
 
     return res.status(200).json({ 
       message: 'Bug status updated successfully', 
-      bug: bug 
+      bug: serializeBug(bug)
     });
   } catch (error) {
     console.error("Update bug status error:", error);
@@ -502,7 +534,7 @@ async function handleReassignBug(req, res) {
 
     return res.status(200).json({ 
       message: 'Bug reassigned successfully', 
-      bug: bug 
+      bug: serializeBug(bug)
     });
   } catch (error) {
     console.error("Reassign bug error:", error);
