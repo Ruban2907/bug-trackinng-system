@@ -5,9 +5,12 @@ import React from 'react';
 import Login from './page/login';
 import Dashboard from './page/dashboard';
 import Projects from './page/projects';
+import ProjectDetails from './page/projects/[id]';
+import MyProjects from './page/projects/my-projects';
 import Users from './page/users';
 import Bugs from './page/bugs';
 import Profile from './page/profile';
+import NotFound from './feature/Error/Error';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -17,6 +20,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
+        <Route path="*" element={<NotFound />} />
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />
@@ -25,6 +29,16 @@ function App() {
         <Route path="/projects" element={
           <ProtectedRoute>
             <Projects />
+          </ProtectedRoute>
+        } />
+        <Route path="/projects/:id" element={
+          <ProtectedRoute>
+            <ProjectDetails />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-projects" element={
+          <ProtectedRoute>
+            <MyProjects />
           </ProtectedRoute>
         } />
         <Route path="/users" element={

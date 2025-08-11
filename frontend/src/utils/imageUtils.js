@@ -58,3 +58,13 @@ export const getProfilePictureUrl = (userInfo) => {
   const result = bufferToBase64(userInfo.picture);
   return result;
 };
+
+// Utility function to get project picture URL
+export const getProjectPictureUrl = (projectPicture) => {
+  if (!projectPicture?.data) {
+    return null;
+  }
+
+  // Backend already converts to base64, so we just need to create the data URL
+  return `data:${projectPicture.contentType};base64,${projectPicture.data}`;
+};

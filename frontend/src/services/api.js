@@ -62,6 +62,14 @@ export const apiService = {
     });
     return response;
   },
+
+  // Project APIs
+  getProjects: () => apiService.authenticatedRequest('/projects', { method: 'GET' }),
+  createProject: (formData) => apiService.authenticatedRequest('/projects', { method: 'POST', body: formData }),
+  updateProject: (projectId, formData) => apiService.authenticatedRequest(`/projects/${projectId}`, { method: 'PATCH', body: formData }),
+  deleteProject: (projectId) => apiService.authenticatedRequest(`/projects/${projectId}`, { method: 'DELETE' }),
+  assignQA: (projectId, qaIds) => apiService.authenticatedRequest(`/projects/${projectId}/assign-qa`, { method: 'POST', body: JSON.stringify({ qaIds }) }),
+  assignDevelopers: (projectId, developerIds) => apiService.authenticatedRequest(`/projects/${projectId}/assign-developers`, { method: 'POST', body: JSON.stringify({ developerIds }) }),
 };
 
 export default apiService;

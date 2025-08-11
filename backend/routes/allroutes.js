@@ -3,7 +3,7 @@ const router = express.Router();
 const upload = require("../middleware/multer");
 const {handleUserlogin, handleUserSignup, handleForgotPassword, handleResetPassword} = require("../controller/auth")
 const {handleCreateUser, handleGetAllUsers, handleGetUserById, handleUpdateUser, handleUpdateProfile, handleGetCurrentUser, handleDeleteUser} = require("../controller/user")
-const {handleCreateProject, handleGetAllProjects, handleGetProjectById, handleUpdateProject, handleDeleteProject, handleAssignQA, handleAssignDevelopers} = require("../controller/project")
+const {handleCreateProject, handleGetAllProjects, handleGetAssignedProjects, handleGetProjectById, handleUpdateProject, handleDeleteProject, handleAssignQA, handleAssignDevelopers} = require("../controller/project")
 const {handleCreateBug, handleGetAllBugs, handleGetBugById, handleUpdateBug, handleDeleteBug, handleUpdateBugStatus, handleReassignBug} = require("../controller/bug")
 const { 
   authenticate, 
@@ -33,11 +33,14 @@ router.patch("/users/:userId", authenticate, requireAdminManagerOrQA, upload.sin
 router.delete("/users/:userId", authenticate, requireAdminManagerOrQA, handleDeleteUser);
 
 // Project management routes (only for managers , admins)
-router.post("/projects", authenticate, requireManagerOrAdmin, handleCreateProject);
+router.post("/projects", authenticate, requireManagerOrAdmin, upload.single("picture"), handleCreateProject);
 router.get("/projects", authenticate, requireManagerOrAdmin, handleGetAllProjects);
 router.get("/projects/:projectId", authenticate, requireManagerOrAdmin, handleGetProjectById);
-router.patch("/projects/:projectId", authenticate, requireManagerOrAdmin, handleUpdateProject);
+router.patch("/projects/:projectId", authenticate, requireManagerOrAdmin, upload.single("picture"), handleUpdateProject);
 router.delete("/projects/:projectId", authenticate, requireManagerOrAdmin, handleDeleteProject);
+
+// Project access routes (for QA engineers and developers to see their assigned projects)
+router.get("/assigned-projects", authenticate, requireAnyUser, handleGetAssignedProjects);
 
 // Project assignment routes (only for managers , admins)
 router.post("/projects/:projectId/assign-qa", authenticate, requireManagerOrAdmin, handleAssignQA);

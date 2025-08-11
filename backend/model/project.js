@@ -11,6 +11,10 @@ const projectSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    picture: {
+      data: Buffer,
+      contentType: String,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "user",
