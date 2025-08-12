@@ -182,18 +182,20 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="flex flex-col md:flex-row w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-gray-50 to-gray-500 p-4">
+      <div className="flex flex-col md:flex-row w-full max-w-4xl max-h-[90vh] bg-gradient-to-r from-gray-300 to-white rounded-2xl shadow-xl overflow-hidden">
         <div className="flex flex-col justify-center items-center w-full md:max-w-md px-4 sm:px-8 py-8 sm:py-12 order-1 md:order-none">
           <div className="w-full max-w-sm h-full flex flex-col">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">Sign In</h2>
+            <h6 className="text-2xl sm:text-3xl text-center font-bold mb-2 text-black">Bug Tracking System 🐞</h6>
+            <h2 className="text-2xl sm:text-3xl text-center font-bold mb-6 text-gray-800">Sign In</h2>
             <div className="flex-1 overflow-y-auto pr-2">
               {!showForgotPassword ? (
                 <form onSubmit={handleSubmit} className="space-y-5 pb-4">
                   <div>
-                    <label className="block text-gray-700 mb-1" htmlFor="email">Email *</label>
+                    <label className="block text-black mb-1" htmlFor="email">Email *</label>
                     <input
                       type="email"
+                      placeholder="example@gmail.com"
                       id="email"
                       name="email"
                       value={form.email}
@@ -204,9 +206,10 @@ const LoginPage = () => {
                   </div>
 
                   <div>
-                    <label className="block text-gray-700 mb-1" htmlFor="password">Password *</label>
+                    <label className="block text-black mb-1" htmlFor="password">Password *</label>
                     <input
                       type="password"
+                      placeholder="your password"
                       id="password"
                       name="password"
                       value={form.password}
@@ -239,6 +242,7 @@ const LoginPage = () => {
                     <label className="block text-gray-700 mb-1" htmlFor="forgotEmail">Email *</label>
                     <input
                       type="email"
+                      placeholder="example@gmail.com"
                       id="forgotEmail"
                       name="forgotEmail"
                       value={forgotEmail}
@@ -259,7 +263,7 @@ const LoginPage = () => {
                     disabled={forgotLoading}
                     className={`w-full py-2 rounded transition ${forgotLoading
                         ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-black hover:bg-slate-700'
                       } text-white`}
                   >
                     {forgotLoading ? 'Verifying...' : 'Verify Email'}
@@ -271,6 +275,7 @@ const LoginPage = () => {
                     <label className="block text-gray-700 mb-1" htmlFor="newPassword">New Password *</label>
                     <input
                       type="password"
+                      placeholder="new password"
                       id="newPassword"
                       name="newPassword"
                       value={resetPassword}
@@ -287,6 +292,7 @@ const LoginPage = () => {
                     <label className="block text-gray-700 mb-1" htmlFor="confirmNewPassword">Confirm New Password *</label>
                     <input
                       type="password"
+                      placeholder="cofirm password"
                       id="confirmNewPassword"
                       name="confirmNewPassword"
                       value={confirmPassword}
