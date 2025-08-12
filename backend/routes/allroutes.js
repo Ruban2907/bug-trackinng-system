@@ -1,14 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const upload = require("../middleware/multer");
-const {handleUserlogin, handleUserSignup, handleForgotPassword, handleResetPassword} = require("../controller/auth")
-const {handleCreateUser, handleGetAllUsers, handleGetUserById, handleUpdateUser, handleUpdateProfile, handleGetCurrentUser, handleDeleteUser} = require("../controller/user")
-const {handleCreateProject, handleGetAllProjects, handleGetAssignedProjects, handleGetProjectById, handleUpdateProject, handleDeleteProject, handleAssignQA, handleAssignDevelopers} = require("../controller/project")
-const {handleCreateBug, handleGetAllBugs, handleGetBugById, handleUpdateBug, handleDeleteBug, handleUpdateBugStatus, handleReassignBug} = require("../controller/bug")
-const { 
-  authenticate, 
-  requireUser, 
-  requireManagerOrAdmin, 
+const { handleUserlogin, handleUserSignup, handleForgotPassword, handleResetPassword } = require("../controller/auth")
+const { handleCreateUser, handleGetAllUsers, handleGetUserById, handleUpdateUser, handleUpdateProfile, handleGetCurrentUser, handleDeleteUser } = require("../controller/user")
+const { handleCreateProject, handleGetAllProjects, handleGetAssignedProjects, handleGetProjectById, handleUpdateProject, handleDeleteProject, handleAssignQA, handleAssignDevelopers } = require("../controller/project")
+const { handleCreateBug, handleGetAllBugs, handleGetBugById, handleUpdateBug, handleDeleteBug, handleUpdateBugStatus, handleReassignBug } = require("../controller/bug")
+const {
+  authenticate,
+  requireManagerOrAdmin,
   requireAnyUser,
   requireAdminManagerOrQA
 } = require("../middleware/authentication");
@@ -26,7 +25,7 @@ router.get("/users/me", authenticate, handleGetCurrentUser);
 router.patch("/users/profile", authenticate, upload.single("picture"), handleUpdateProfile);
 
 // User routes
-router.post("/users", authenticate, requireAdminManagerOrQA, upload.single("picture"), handleCreateUser);
+router.post("/users", authenticate, requireManagerOrAdmin, upload.single("picture"), handleCreateUser);
 router.get("/users", authenticate, requireAdminManagerOrQA, handleGetAllUsers);
 router.get("/users/:userId", authenticate, requireAdminManagerOrQA, handleGetUserById);
 router.patch("/users/:userId", authenticate, requireAdminManagerOrQA, upload.single("picture"), handleUpdateUser);

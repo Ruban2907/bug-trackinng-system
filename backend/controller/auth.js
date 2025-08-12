@@ -2,69 +2,65 @@ const User = require("../model/user");
 const { setUser } = require("../services/secret");
 const bcrypt = require('bcrypt');
 
-async function handleUserlogin(req,res) {
-    try {
-      const {email, password} = req.body;
-      if (!email || !password)
-      {  
-        return res.status(400).json({ message: "Email and Password are required" });
-      }
-      const foundUser = await User.findOne({ email: email });
-      if(!foundUser)
-      {
-        return res.status(400).json('Invalid Username or Password')
-      }
-      const match = await bcrypt.compare(password, foundUser.password);
-      if (match)
-      {
-        const token = setUser(foundUser);
-
-        const userData = {
-            _id: foundUser._id,
-            firstname: foundUser.firstname,
-            lastname: foundUser.lastname,
-            email: foundUser.email,
-            role: foundUser.role,
-            picture: foundUser.picture ? true : false // Just indicate if picture exists
-          };
-          return res.status(200).json({ message: "User logged in", token, foundUser: userData });
-      } else {
-        return res.status(400).json('Invalid Username or Password')
-      }
-    } catch (error) {
-        console.error("Login error:", error);
-        res.status(500).json({ message: "Internal server error during login" });
+async function handleUserlogin(req, res) {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and Password are required" });
     }
+    const foundUser = await User.findOne({ email: email });
+    if (!foundUser) {
+      return res.status(400).json('Invalid Username or Password')
+    }
+    const match = await bcrypt.compare(password, foundUser.password);
+    if (match) {
+      const token = setUser(foundUser);
+
+      const userData = {
+        _id: foundUser._id,
+        firstname: foundUser.firstname,
+        lastname: foundUser.lastname,
+        email: foundUser.email,
+        role: foundUser.role,
+        picture: foundUser.picture ? true : false
+      };
+      return res.status(200).json({ message: "User logged in", token, foundUser: userData });
+    } else {
+      return res.status(400).json('Invalid Username or Password')
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error during login" });
+  }
 }
 
-async function handleUserSignup(req,res) {
-   try {
-    const {firstname, lastname, email, password, role} = req.body;
-    
+async function handleUserSignup(req, res) {
+  try {
+    const { firstname, lastname, email, password, role } = req.body;
+
     if (role && !['admin', 'manager'].includes(role)) {
-      return res.status(403).json({ 
-        message: "Only admin and manager accounts can be created during signup." 
+      return res.status(403).json({
+        message: "Only admin and manager accounts can be created during signup."
       });
     }
 
-    const hashpass = await bcrypt.hash(password,10);
+    const hashpass = await bcrypt.hash(password, 10);
     const userData = {
       firstname: firstname,
       lastname: lastname,
       email: email,
       password: hashpass,
-      role: role || 'manager', 
+      role: role || 'manager',
     };
     if (req.file) {
-        userData.picture = {
-          data: req.file.buffer,
-          contentType: req.file.mimetype,
-        };
+      userData.picture = {
+        data: req.file.buffer,
+        contentType: req.file.mimetype,
+      };
     }
 
     const newUser = await User.create(userData);
     const token = setUser(newUser);
-    // Convert Buffer to base64 for frontend serialization
     let pictureData = null;
     if (newUser.picture && newUser.picture.data) {
       pictureData = {
@@ -81,16 +77,16 @@ async function handleUserSignup(req,res) {
       role: newUser.role,
       picture: pictureData
     };
-    return res.status(201).json({ 
-      message: 'registered successfully', 
-      token, 
-      foundUser: userResponse 
+    return res.status(201).json({
+      message: 'registered successfully',
+      token,
+      foundUser: userResponse
     });
-    } 
-    catch (error) {
-      console.error("Signup error:", error);
-      res.status(400).json('not registered');
-    }
+  }
+  catch (error) {
+    console.error("Signup error:", error);
+    res.status(400).json('not registered');
+  }
 }
 
 async function handleForgotPassword(req, res) {
@@ -125,7 +121,7 @@ async function handleResetPassword(req, res) {
     }
 
     const hashpass = await bcrypt.hash(newPassword, 10);
-    
+
     await User.findByIdAndUpdate(foundUser._id, { password: hashpass });
 
     return res.status(200).json({ message: "Password reset successfully" });

@@ -4,23 +4,21 @@ const User = require("../model/user");
 function serializeProject(projectDoc) {
   if (!projectDoc) return projectDoc;
   const project = projectDoc.toObject ? projectDoc.toObject() : projectDoc;
-  
-  // Serialize project picture
+
   if (project.picture && project.picture.data) {
     project.picture = {
       data: project.picture.data.toString('base64'),
       contentType: project.picture.contentType,
     };
   }
-  
-  // Serialize user pictures (createdBy, qaAssigned, developersAssigned)
+
   if (project.createdBy && project.createdBy.picture && project.createdBy.picture.data) {
     project.createdBy.picture = {
       data: project.createdBy.picture.data.toString('base64'),
       contentType: project.createdBy.picture.contentType,
     };
   }
-  
+
   if (project.qaAssigned) {
     project.qaAssigned = project.qaAssigned.map(user => {
       if (user.picture && user.picture.data) {
@@ -35,7 +33,7 @@ function serializeProject(projectDoc) {
       return user;
     });
   }
-  
+
   if (project.developersAssigned) {
     project.developersAssigned = project.developersAssigned.map(user => {
       if (user.picture && user.picture.data) {
@@ -50,14 +48,13 @@ function serializeProject(projectDoc) {
       return user;
     });
   }
-  
+
   return project;
 }
 
 async function handleCreateProject(req, res) {
   try {
     const { name, description } = req.body;
-    // Parse optional arrays flexibly from either JSON or form fields
     let qaAssigned = [];
     let developersAssigned = [];
 
@@ -80,18 +77,17 @@ async function handleCreateProject(req, res) {
         developersAssigned = [];
       }
     }
-    
-    // Use the user data from the middleware
+
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can create projects" 
+      return res.status(403).json({
+        message: "Access denied: Only managers and admins can create projects"
       });
     }
 
     if (!name) {
-      return res.status(400).json({ 
-        message: "Project name is required" 
+      return res.status(400).json({
+        message: "Project name is required"
       });
     }
 
@@ -99,8 +95,8 @@ async function handleCreateProject(req, res) {
       for (const qaId of qaAssigned) {
         const qaUser = await User.findById(qaId);
         if (!qaUser || qaUser.role !== 'qa') {
-          return res.status(400).json({ 
-            message: `Invalid QA user ID: ${qaId}` 
+          return res.status(400).json({
+            message: `Invalid QA user ID: ${qaId}`
           });
         }
       }
@@ -108,16 +104,16 @@ async function handleCreateProject(req, res) {
 
     if (developersAssigned && developersAssigned.length > 0) {
       if (!qaAssigned || qaAssigned.length === 0) {
-        return res.status(400).json({ 
-          message: "Developers cannot be assigned before QA team members" 
+        return res.status(400).json({
+          message: "Developers cannot be assigned before QA team members"
         });
       }
 
       for (const devId of developersAssigned) {
         const devUser = await User.findById(devId);
         if (!devUser || devUser.role !== 'developer') {
-          return res.status(400).json({ 
-            message: `Invalid developer user ID: ${devId}` 
+          return res.status(400).json({
+            message: `Invalid developer user ID: ${devId}`
           });
         }
       }
@@ -131,7 +127,6 @@ async function handleCreateProject(req, res) {
       developersAssigned: developersAssigned || [],
     };
 
-    // Optional picture
     if (req.file) {
       if (!req.file.mimetype.startsWith('image/')) {
         return res.status(400).json({ message: 'Only image files are allowed for project picture' });
@@ -153,9 +148,9 @@ async function handleCreateProject(req, res) {
       { path: 'developersAssigned', select: 'firstname lastname email role' }
     ]);
 
-    return res.status(201).json({ 
-      message: 'Project created successfully', 
-      project: serializeProject(newProject) 
+    return res.status(201).json({
+      message: 'Project created successfully',
+      project: serializeProject(newProject)
     });
   } catch (error) {
     console.error("Create project error:", error);
@@ -165,11 +160,10 @@ async function handleCreateProject(req, res) {
 
 async function handleGetAllProjects(req, res) {
   try {
-    // Use the user data from the middleware
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can view all projects" 
+      return res.status(403).json({
+        message: "Access denied: Only managers and admins can view all projects"
       });
     }
 
@@ -181,9 +175,9 @@ async function handleGetAllProjects(req, res) {
 
     const serialized = projects.map(serializeProject);
 
-    return res.status(200).json({ 
-      message: 'Projects retrieved successfully', 
-      projects: serialized 
+    return res.status(200).json({
+      message: 'Projects retrieved successfully',
+      projects: serialized
     });
   } catch (error) {
     console.error("Get all projects error:", error);
@@ -193,11 +187,10 @@ async function handleGetAllProjects(req, res) {
 
 async function handleGetAssignedProjects(req, res) {
   try {
-    // Use the user data from the middleware
     const currentUser = req.currentUser;
     if (!currentUser || !['qa', 'developer'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only QA engineers and developers can access this endpoint" 
+      return res.status(403).json({
+        message: "Access denied: Only QA engineers and developers can access this endpoint"
       });
     }
 
@@ -207,25 +200,24 @@ async function handleGetAssignedProjects(req, res) {
       .populate('developersAssigned', 'firstname lastname email role picture')
       .sort({ createdAt: -1 });
 
-    // Filter projects based on user role
     let assignedProjects = [];
     if (currentUser.role === 'qa') {
-      assignedProjects = projects.filter(project => 
-        project.qaAssigned && 
+      assignedProjects = projects.filter(project =>
+        project.qaAssigned &&
         project.qaAssigned.some(qa => qa._id.toString() === currentUser._id.toString())
       );
     } else if (currentUser.role === 'developer') {
-      assignedProjects = projects.filter(project => 
-        project.developersAssigned && 
+      assignedProjects = projects.filter(project =>
+        project.developersAssigned &&
         project.developersAssigned.some(dev => dev._id.toString() === currentUser._id.toString())
       );
     }
 
     const serialized = assignedProjects.map(serializeProject);
 
-    return res.status(200).json({ 
-      message: 'Assigned projects retrieved successfully', 
-      projects: serialized 
+    return res.status(200).json({
+      message: 'Assigned projects retrieved successfully',
+      projects: serialized
     });
   } catch (error) {
     console.error("Get assigned projects error:", error);
@@ -236,13 +228,12 @@ async function handleGetAssignedProjects(req, res) {
 async function handleGetProjectById(req, res) {
   try {
     const { projectId } = req.params;
-    
-    // Use the user data from the middleware
+
     const currentUser = req.currentUser;
 
     if (!projectId) {
-      return res.status(400).json({ 
-        message: "Project ID is required" 
+      return res.status(400).json({
+        message: "Project ID is required"
       });
     }
 
@@ -252,14 +243,14 @@ async function handleGetProjectById(req, res) {
       .populate('developersAssigned', 'firstname lastname email role picture');
 
     if (!project) {
-      return res.status(404).json({ 
-        message: "Project not found" 
+      return res.status(404).json({
+        message: "Project not found"
       });
     }
 
-    return res.status(200).json({ 
-      message: 'Project retrieved successfully', 
-      project: serializeProject(project) 
+    return res.status(200).json({
+      message: 'Project retrieved successfully',
+      project: serializeProject(project)
     });
   } catch (error) {
     console.error("Get project by ID error:", error);
@@ -292,25 +283,24 @@ async function handleUpdateProject(req, res) {
         developersAssigned = [];
       }
     }
-    
-    // Use the user data from the middleware
+
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can update projects" 
+      return res.status(403).json({
+        message: "Access denied: Only managers and admins can update projects"
       });
     }
 
     if (!projectId) {
-      return res.status(400).json({ 
-        message: "Project ID is required" 
+      return res.status(400).json({
+        message: "Project ID is required"
       });
     }
 
     const project = await Project.findById(projectId);
     if (!project) {
-      return res.status(404).json({ 
-        message: "Project not found" 
+      return res.status(404).json({
+        message: "Project not found"
       });
     }
 
@@ -318,8 +308,8 @@ async function handleUpdateProject(req, res) {
       for (const qaId of qaAssigned) {
         const qaUser = await User.findById(qaId);
         if (!qaUser || qaUser.role !== 'qa') {
-          return res.status(400).json({ 
-            message: `Invalid QA user ID: ${qaId}` 
+          return res.status(400).json({
+            message: `Invalid QA user ID: ${qaId}`
           });
         }
       }
@@ -328,16 +318,16 @@ async function handleUpdateProject(req, res) {
     if (developersAssigned && developersAssigned.length > 0) {
       const finalQaAssigned = qaAssigned || project.qaAssigned;
       if (!finalQaAssigned || finalQaAssigned.length === 0) {
-        return res.status(400).json({ 
-          message: "Developers cannot be assigned before QA team members" 
+        return res.status(400).json({
+          message: "Developers cannot be assigned before QA team members"
         });
       }
 
       for (const devId of developersAssigned) {
         const devUser = await User.findById(devId);
         if (!devUser || devUser.role !== 'developer') {
-          return res.status(400).json({ 
-            message: `Invalid developer user ID: ${devId}` 
+          return res.status(400).json({
+            message: `Invalid developer user ID: ${devId}`
           });
         }
       }
@@ -348,7 +338,6 @@ async function handleUpdateProject(req, res) {
     if (qaAssigned !== undefined) project.qaAssigned = qaAssigned;
     if (developersAssigned !== undefined) project.developersAssigned = developersAssigned;
 
-    // Optional picture update
     if (req.file) {
       if (!req.file.mimetype.startsWith('image/')) {
         return res.status(400).json({ message: 'Only image files are allowed for project picture' });
@@ -370,9 +359,9 @@ async function handleUpdateProject(req, res) {
       { path: 'developersAssigned', select: 'firstname lastname email role' }
     ]);
 
-    return res.status(200).json({ 
-      message: 'Project updated successfully', 
-      project: serializeProject(project) 
+    return res.status(200).json({
+      message: 'Project updated successfully',
+      project: serializeProject(project)
     });
   } catch (error) {
     console.error("Update project error:", error);
@@ -383,32 +372,31 @@ async function handleUpdateProject(req, res) {
 async function handleDeleteProject(req, res) {
   try {
     const { projectId } = req.params;
-    
-    // Use the user data from the middleware
+
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can delete projects" 
+      return res.status(403).json({
+        message: "Access denied: Only managers and admins can delete projects"
       });
     }
 
     if (!projectId) {
-      return res.status(400).json({ 
-        message: "Project ID is required" 
+      return res.status(400).json({
+        message: "Project ID is required"
       });
     }
 
     const project = await Project.findById(projectId);
     if (!project) {
-      return res.status(404).json({ 
-        message: "Project not found" 
+      return res.status(404).json({
+        message: "Project not found"
       });
     }
 
     await Project.findByIdAndDelete(projectId);
 
-    return res.status(200).json({ 
-      message: 'Project deleted successfully' 
+    return res.status(200).json({
+      message: 'Project deleted successfully'
     });
   } catch (error) {
     console.error("Delete project error:", error);
@@ -419,40 +407,39 @@ async function handleDeleteProject(req, res) {
 async function handleAssignQA(req, res) {
   try {
     const { projectId } = req.params;
-    const { qaIds } = req.body; 
-    
-    // Use the user data from the middleware
+    const { qaIds } = req.body;
+
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can assign QA to projects" 
+      return res.status(403).json({
+        message: "Access denied: Only managers and admins can assign QA to projects"
       });
     }
 
     if (!projectId) {
-      return res.status(400).json({ 
-        message: "Project ID is required" 
+      return res.status(400).json({
+        message: "Project ID is required"
       });
     }
 
     if (!qaIds || !Array.isArray(qaIds) || qaIds.length === 0) {
-      return res.status(400).json({ 
-        message: "QA IDs array is required and must not be empty" 
+      return res.status(400).json({
+        message: "QA IDs array is required and must not be empty"
       });
     }
 
     const project = await Project.findById(projectId);
     if (!project) {
-      return res.status(404).json({ 
-        message: "Project not found" 
+      return res.status(404).json({
+        message: "Project not found"
       });
     }
 
     for (const qaId of qaIds) {
       const qaUser = await User.findById(qaId);
       if (!qaUser || qaUser.role !== 'qa') {
-        return res.status(400).json({ 
-          message: `Invalid QA user ID: ${qaId}` 
+        return res.status(400).json({
+          message: `Invalid QA user ID: ${qaId}`
         });
       }
     }
@@ -466,9 +453,9 @@ async function handleAssignQA(req, res) {
       { path: 'developersAssigned', select: 'firstname lastname email role' }
     ]);
 
-    return res.status(200).json({ 
-      message: 'QA team assigned successfully', 
-      project: serializeProject(project) 
+    return res.status(200).json({
+      message: 'QA team assigned successfully',
+      project: serializeProject(project)
     });
   } catch (error) {
     console.error("Assign QA error:", error);
@@ -479,46 +466,45 @@ async function handleAssignQA(req, res) {
 async function handleAssignDevelopers(req, res) {
   try {
     const { projectId } = req.params;
-    const { developerIds } = req.body; 
-    
-    // Use the user data from the middleware
+    const { developerIds } = req.body;
+
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can assign developers to projects" 
+      return res.status(403).json({
+        message: "Access denied: Only managers and admins can assign developers to projects"
       });
     }
 
     if (!projectId) {
-      return res.status(400).json({ 
-        message: "Project ID is required" 
+      return res.status(400).json({
+        message: "Project ID is required"
       });
     }
 
     if (!developerIds || !Array.isArray(developerIds) || developerIds.length === 0) {
-      return res.status(400).json({ 
-        message: "Developer IDs array is required and must not be empty" 
+      return res.status(400).json({
+        message: "Developer IDs array is required and must not be empty"
       });
     }
 
     const project = await Project.findById(projectId);
     if (!project) {
-      return res.status(404).json({ 
-        message: "Project not found" 
+      return res.status(404).json({
+        message: "Project not found"
       });
     }
 
     if (!project.qaAssigned || project.qaAssigned.length === 0) {
-      return res.status(400).json({ 
-        message: "Developers cannot be assigned before QA team members" 
+      return res.status(400).json({
+        message: "Developers cannot be assigned before QA team members"
       });
     }
 
     for (const devId of developerIds) {
       const devUser = await User.findById(devId);
       if (!devUser || devUser.role !== 'developer') {
-        return res.status(400).json({ 
-          message: `Invalid developer user ID: ${devId}` 
+        return res.status(400).json({
+          message: `Invalid developer user ID: ${devId}`
         });
       }
     }
@@ -532,9 +518,9 @@ async function handleAssignDevelopers(req, res) {
       { path: 'developersAssigned', select: 'firstname lastname email role' }
     ]);
 
-    return res.status(200).json({ 
-      message: 'Developers assigned successfully', 
-      project: serializeProject(project) 
+    return res.status(200).json({
+      message: 'Developers assigned successfully',
+      project: serializeProject(project)
     });
   } catch (error) {
     console.error("Assign developers error:", error);

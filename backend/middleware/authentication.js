@@ -33,8 +33,8 @@ async function requireManagerOrAdmin(req, res, next) {
     }
 
     if (!['admin', 'manager'].includes(user.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only managers and admins can perform this action" 
+      return res.status(403).json({
+        message: "Access denied: Only managers and admins can perform this action"
       });
     }
 
@@ -136,7 +136,6 @@ async function requireAnyUser(req, res, next) {
   }
 }
 
-// Middleware to require admin, manager, or QA role
 const requireAdminManagerOrQA = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -155,8 +154,8 @@ const requireAdminManagerOrQA = async (req, res, next) => {
     }
 
     if (!['admin', 'manager', 'qa'].includes(user.role)) {
-      return res.status(403).json({ 
-        message: "Access denied: Only admins, managers, and QA can access this resource" 
+      return res.status(403).json({
+        message: "Access denied: Only admins, managers, and QA can access this resource"
       });
     }
 
@@ -169,10 +168,10 @@ const requireAdminManagerOrQA = async (req, res, next) => {
   }
 };
 
-module.exports = { 
-  authenticate, 
-  requireAdmin, 
-  requireUser, 
+module.exports = {
+  authenticate,
+  requireAdmin,
+  requireUser,
   requireManagerOrAdmin,
   requireAnyUser,
   requireAdminManagerOrQA

@@ -2,38 +2,35 @@ const Bug = require("../model/bug");
 const Project = require("../model/project");
 const User = require("../model/user");
 
-// Helper function to serialize bug data for JSON response
 function serializeBug(bug) {
   const bugObj = bug.toObject();
-  
-  // Convert Buffer to base64 for screenshot
   if (bugObj.screenshot && bugObj.screenshot.data) {
     bugObj.screenshot.data = bugObj.screenshot.data.toString('base64');
   }
-  
+
   return bugObj;
 }
 
 async function handleCreateBug(req, res) {
   try {
     const { title, type, status, description, deadline, projectId, assignedTo } = req.body;
-    
+
     const currentUser = req.currentUser;
     if (!currentUser) {
-      return res.status(401).json({ 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        message: "User not authenticated"
       });
     }
 
     if (currentUser.role === 'developer') {
-      return res.status(403).json({ 
-        message: "Access denied: Developers cannot create bugs" 
+      return res.status(403).json({
+        message: "Access denied: Developers cannot create bugs"
       });
     }
 
     if (!title || !type || !projectId) {
-      return res.status(400).json({ 
-        message: "Title, type, and projectId are required" 
+      return res.status(400).json({
+        message: "Title, type, and projectId are required"
       });
     }
 
@@ -42,48 +39,48 @@ async function handleCreateBug(req, res) {
       .populate('developersAssigned', '_id');
 
     if (!project) {
-      return res.status(404).json({ 
-        message: "Project not found" 
+      return res.status(404).json({
+        message: "Project not found"
       });
     }
 
-    const hasAccess = 
-      currentUser.role === 'admin' || 
+    const hasAccess =
+      currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa._id.toString() === currentUser._id.toString());
 
     if (!hasAccess) {
-      return res.status(403).json({ 
-        message: "Access denied: You can only create bugs in projects assigned to you" 
+      return res.status(403).json({
+        message: "Access denied: You can only create bugs in projects assigned to you"
       });
     }
 
     if (!project.developersAssigned || project.developersAssigned.length === 0) {
-      return res.status(400).json({ 
-        message: "Cannot create bug: No developers are assigned to this project" 
+      return res.status(400).json({
+        message: "Cannot create bug: No developers are assigned to this project"
       });
     }
 
     let assignedDeveloperId;
-    
+
     if (assignedTo) {
       const isDeveloperInProject = project.developersAssigned.some(
         dev => dev._id.toString() === assignedTo
       );
-      
+
       if (!isDeveloperInProject) {
-        return res.status(400).json({ 
-          message: "Assigned developer is not part of this project" 
+        return res.status(400).json({
+          message: "Assigned developer is not part of this project"
         });
       }
-      
+
       const assignedDeveloper = await User.findById(assignedTo);
       if (!assignedDeveloper || assignedDeveloper.role !== 'developer') {
-        return res.status(400).json({ 
-          message: "Assigned user must be a developer" 
+        return res.status(400).json({
+          message: "Assigned user must be a developer"
         });
       }
-      
+
       assignedDeveloperId = assignedTo;
     } else {
       assignedDeveloperId = project.developersAssigned[0]._id;
@@ -108,14 +105,14 @@ async function handleCreateBug(req, res) {
     }
 
     const newBug = await Bug.create(bugData);
-    
+
     await newBug.populate([
       { path: 'createdBy', select: 'firstname lastname email role' },
       { path: 'assignedTo', select: 'firstname lastname email role' }
     ]);
 
-    return res.status(201).json({ 
-      message: 'Bug/Feature created successfully', 
+    return res.status(201).json({
+      message: 'Bug/Feature created successfully',
       bug: serializeBug(newBug)
     });
   } catch (error) {
@@ -127,11 +124,11 @@ async function handleCreateBug(req, res) {
 async function handleGetAllBugs(req, res) {
   try {
     const { projectId } = req.query;
-    
+
     const currentUser = req.currentUser;
     if (!currentUser) {
-      return res.status(401).json({ 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        message: "User not authenticated"
       });
     }
 
@@ -143,20 +140,20 @@ async function handleGetAllBugs(req, res) {
         .populate('developersAssigned', '_id');
 
       if (!project) {
-        return res.status(404).json({ 
-          message: "Project not found" 
+        return res.status(404).json({
+          message: "Project not found"
         });
       }
 
-      const hasAccess = 
-        currentUser.role === 'admin' || 
+      const hasAccess =
+        currentUser.role === 'admin' ||
         currentUser.role === 'manager' ||
         project.qaAssigned.some(qa => qa._id.toString() === currentUser._id.toString()) ||
         project.developersAssigned.some(dev => dev._id.toString() === currentUser._id.toString());
 
       if (!hasAccess) {
-        return res.status(403).json({ 
-          message: "Access denied: You can only view bugs in projects assigned to you" 
+        return res.status(403).json({
+          message: "Access denied: You can only view bugs in projects assigned to you"
         });
       }
 
@@ -171,8 +168,8 @@ async function handleGetAllBugs(req, res) {
 
       if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
         if (projects.length === 0) {
-          return res.status(403).json({ 
-            message: "Access denied: You don't have access to any projects" 
+          return res.status(403).json({
+            message: "Access denied: You don't have access to any projects"
           });
         }
         query.projectId = { $in: projects.map(p => p._id) };
@@ -185,13 +182,12 @@ async function handleGetAllBugs(req, res) {
       .populate('projectId', 'name')
       .select('+screenshot')
       .sort({ createdAt: -1 });
-    
-    // Serialize bugs to convert Buffer data to base64
+
     const serializedBugs = bugs.map(bug => serializeBug(bug));
-    
-    return res.status(200).json({ 
-      message: 'Bugs retrieved successfully', 
-      bugs: serializedBugs 
+
+    return res.status(200).json({
+      message: 'Bugs retrieved successfully',
+      bugs: serializedBugs
     });
   } catch (error) {
     console.error("Get all bugs error:", error);
@@ -202,17 +198,17 @@ async function handleGetAllBugs(req, res) {
 async function handleGetBugById(req, res) {
   try {
     const { bugId } = req.params;
-    
+
     const currentUser = req.currentUser;
     if (!currentUser) {
-      return res.status(401).json({ 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        message: "User not authenticated"
       });
     }
 
     if (!bugId) {
-      return res.status(400).json({ 
-        message: "Bug ID is required" 
+      return res.status(400).json({
+        message: "Bug ID is required"
       });
     }
 
@@ -222,26 +218,26 @@ async function handleGetBugById(req, res) {
       .populate('projectId', 'name qaAssigned developersAssigned');
 
     if (!bug) {
-      return res.status(404).json({ 
-        message: "Bug not found" 
+      return res.status(404).json({
+        message: "Bug not found"
       });
     }
 
     const project = bug.projectId;
-    const hasAccess = 
-      currentUser.role === 'admin' || 
+    const hasAccess =
+      currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString()) ||
       project.developersAssigned.some(dev => dev.toString() === currentUser._id.toString());
 
     if (!hasAccess) {
-      return res.status(403).json({ 
-        message: "Access denied: You can only view bugs in projects assigned to you" 
+      return res.status(403).json({
+        message: "Access denied: You can only view bugs in projects assigned to you"
       });
     }
 
-    return res.status(200).json({ 
-      message: 'Bug retrieved successfully', 
+    return res.status(200).json({
+      message: 'Bug retrieved successfully',
       bug: serializeBug(bug)
     });
   } catch (error) {
@@ -254,17 +250,17 @@ async function handleUpdateBug(req, res) {
   try {
     const { bugId } = req.params;
     const { title, type, status, description, deadline, assignedTo } = req.body;
-    
+
     const currentUser = req.currentUser;
     if (!currentUser) {
-      return res.status(401).json({ 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        message: "User not authenticated"
       });
     }
 
     if (!bugId) {
-      return res.status(400).json({ 
-        message: "Bug ID is required" 
+      return res.status(400).json({
+        message: "Bug ID is required"
       });
     }
 
@@ -272,21 +268,21 @@ async function handleUpdateBug(req, res) {
       .populate('projectId', 'qaAssigned developersAssigned');
 
     if (!bug) {
-      return res.status(404).json({ 
-        message: "Bug not found" 
+      return res.status(404).json({
+        message: "Bug not found"
       });
     }
 
     const project = bug.projectId;
-    const hasAccess = 
-      currentUser.role === 'admin' || 
+    const hasAccess =
+      currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString()) ||
       project.developersAssigned.some(dev => dev.toString() === currentUser._id.toString());
 
     if (!hasAccess) {
-      return res.status(403).json({ 
-        message: "Access denied: You can only update bugs in projects assigned to you" 
+      return res.status(403).json({
+        message: "Access denied: You can only update bugs in projects assigned to you"
       });
     }
 
@@ -294,8 +290,8 @@ async function handleUpdateBug(req, res) {
       if (status) {
         bug.status = status;
       } else {
-        return res.status(400).json({ 
-          message: "Developers can only update bug status" 
+        return res.status(400).json({
+          message: "Developers can only update bug status"
         });
       }
     } else {
@@ -305,19 +301,17 @@ async function handleUpdateBug(req, res) {
       if (description !== undefined) bug.description = description;
       if (deadline !== undefined) bug.deadline = deadline;
 
-      // Handle reassignment if provided
       if (assignedTo) {
-        // Verify the new assignee is a developer in the project
         const isDeveloperInProject = project.developersAssigned.some(
           dev => dev._id.toString() === assignedTo
         );
-        
+
         if (!isDeveloperInProject) {
-          return res.status(400).json({ 
-            message: "Assigned developer must be part of this project" 
+          return res.status(400).json({
+            message: "Assigned developer must be part of this project"
           });
         }
-        
+
         bug.assignedTo = assignedTo;
       }
 
@@ -337,8 +331,8 @@ async function handleUpdateBug(req, res) {
       { path: 'projectId', select: 'name' }
     ]);
 
-    return res.status(200).json({ 
-      message: 'Bug updated successfully', 
+    return res.status(200).json({
+      message: 'Bug updated successfully',
       bug: serializeBug(bug)
     });
   } catch (error) {
@@ -350,17 +344,17 @@ async function handleUpdateBug(req, res) {
 async function handleDeleteBug(req, res) {
   try {
     const { bugId } = req.params;
-    
+
     const currentUser = req.currentUser;
     if (!currentUser) {
-      return res.status(401).json({ 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        message: "User not authenticated"
       });
     }
 
     if (!bugId) {
-      return res.status(400).json({ 
-        message: "Bug ID is required" 
+      return res.status(400).json({
+        message: "Bug ID is required"
       });
     }
 
@@ -368,27 +362,27 @@ async function handleDeleteBug(req, res) {
       .populate('projectId', 'qaAssigned developersAssigned');
 
     if (!bug) {
-      return res.status(404).json({ 
-        message: "Bug not found" 
+      return res.status(404).json({
+        message: "Bug not found"
       });
     }
 
     const project = bug.projectId;
-    const hasAccess = 
-      currentUser.role === 'admin' || 
+    const hasAccess =
+      currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString());
 
     if (!hasAccess) {
-      return res.status(403).json({ 
-        message: "Access denied: Only QA, managers, and admins can delete bugs" 
+      return res.status(403).json({
+        message: "Access denied: Only QA, managers, and admins can delete bugs"
       });
     }
 
     await Bug.findByIdAndDelete(bugId);
 
-    return res.status(200).json({ 
-      message: 'Bug deleted successfully' 
+    return res.status(200).json({
+      message: 'Bug deleted successfully'
     });
   } catch (error) {
     console.error("Delete bug error:", error);
@@ -400,23 +394,23 @@ async function handleUpdateBugStatus(req, res) {
   try {
     const { bugId } = req.params;
     const { status } = req.body;
-    
+
     const currentUser = req.currentUser;
     if (!currentUser) {
-      return res.status(401).json({ 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        message: "User not authenticated"
       });
     }
 
     if (!bugId) {
-      return res.status(400).json({ 
-        message: "Bug ID is required" 
+      return res.status(400).json({
+        message: "Bug ID is required"
       });
     }
 
     if (!status) {
-      return res.status(400).json({ 
-        message: "Status is required" 
+      return res.status(400).json({
+        message: "Status is required"
       });
     }
 
@@ -424,21 +418,21 @@ async function handleUpdateBugStatus(req, res) {
       .populate('projectId', 'qaAssigned developersAssigned');
 
     if (!bug) {
-      return res.status(404).json({ 
-        message: "Bug not found" 
+      return res.status(404).json({
+        message: "Bug not found"
       });
     }
 
     const project = bug.projectId;
-    const hasAccess = 
-      currentUser.role === 'admin' || 
+    const hasAccess =
+      currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString()) ||
       project.developersAssigned.some(dev => dev.toString() === currentUser._id.toString());
 
     if (!hasAccess) {
-      return res.status(403).json({ 
-        message: "Access denied: You can only update bugs in projects assigned to you" 
+      return res.status(403).json({
+        message: "Access denied: You can only update bugs in projects assigned to you"
       });
     }
 
@@ -451,8 +445,8 @@ async function handleUpdateBugStatus(req, res) {
       { path: 'projectId', select: 'name' }
     ]);
 
-    return res.status(200).json({ 
-      message: 'Bug status updated successfully', 
+    return res.status(200).json({
+      message: 'Bug status updated successfully',
       bug: serializeBug(bug)
     });
   } catch (error) {
@@ -465,23 +459,23 @@ async function handleReassignBug(req, res) {
   try {
     const { bugId } = req.params;
     const { assignedTo } = req.body;
-    
+
     const currentUser = req.currentUser;
     if (!currentUser) {
-      return res.status(401).json({ 
-        message: "User not authenticated" 
+      return res.status(401).json({
+        message: "User not authenticated"
       });
     }
 
     if (!bugId) {
-      return res.status(400).json({ 
-        message: "Bug ID is required" 
+      return res.status(400).json({
+        message: "Bug ID is required"
       });
     }
 
     if (!assignedTo) {
-      return res.status(400).json({ 
-        message: "Assigned developer ID is required" 
+      return res.status(400).json({
+        message: "Assigned developer ID is required"
       });
     }
 
@@ -489,37 +483,37 @@ async function handleReassignBug(req, res) {
       .populate('projectId', 'qaAssigned developersAssigned');
 
     if (!bug) {
-      return res.status(404).json({ 
-        message: "Bug not found" 
+      return res.status(404).json({
+        message: "Bug not found"
       });
     }
 
     const project = bug.projectId;
-    const hasAccess = 
-      currentUser.role === 'admin' || 
+    const hasAccess =
+      currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString());
 
     if (!hasAccess) {
-      return res.status(403).json({ 
-        message: "Access denied: Only QA, managers, and admins can reassign bugs" 
+      return res.status(403).json({
+        message: "Access denied: Only QA, managers, and admins can reassign bugs"
       });
     }
 
     const isDeveloperInProject = project.developersAssigned.some(
       dev => dev.toString() === assignedTo
     );
-    
+
     if (!isDeveloperInProject) {
-      return res.status(400).json({ 
-        message: "Assigned developer is not part of this project" 
+      return res.status(400).json({
+        message: "Assigned developer is not part of this project"
       });
     }
-    
+
     const assignedDeveloper = await User.findById(assignedTo);
     if (!assignedDeveloper || assignedDeveloper.role !== 'developer') {
-      return res.status(400).json({ 
-        message: "Assigned user must be a developer" 
+      return res.status(400).json({
+        message: "Assigned user must be a developer"
       });
     }
 
@@ -532,8 +526,8 @@ async function handleReassignBug(req, res) {
       { path: 'projectId', select: 'name' }
     ]);
 
-    return res.status(200).json({ 
-      message: 'Bug reassigned successfully', 
+    return res.status(200).json({
+      message: 'Bug reassigned successfully',
       bug: serializeBug(bug)
     });
   } catch (error) {
