@@ -1,6 +1,17 @@
 const User = require("../model/user");
 const bcrypt = require('bcrypt');
 
+const canManageRole = (currentUserRole, targetRole) => {
+  switch (currentUserRole) {
+    case 'admin':
+      return ['manager', 'qa', 'developer'].includes(targetRole);
+    case 'manager':
+      return ['qa', 'developer'].includes(targetRole);
+    default:
+      return false;
+  }
+};
+
 async function handleCreateUser(req, res) {
   try {
     const { firstname, lastname, email, password, role } = req.body;
@@ -18,18 +29,7 @@ async function handleCreateUser(req, res) {
       });
     }
 
-    const canCreateRole = (currentUserRole, requestedRole) => {
-      switch (currentUserRole) {
-        case 'admin':
-          return ['manager', 'qa', 'developer'].includes(requestedRole);
-        case 'manager':
-          return ['qa', 'developer'].includes(requestedRole);
-        default:
-          return false;
-      }
-    };
-
-    if (!canCreateRole(currentUser.role, role)) {
+    if (!canManageRole(currentUser.role, role)) {
       return res.status(403).json({
         message: `Access denied: You cannot create ${role} users`
       });
@@ -102,18 +102,7 @@ async function handleGetAllUsers(req, res) {
     let query = {};
 
     if (role) {
-      const canAccessRole = (currentUserRole, requestedRole) => {
-        switch (currentUserRole) {
-          case 'admin':
-            return ['manager', 'qa', 'developer'].includes(requestedRole);
-          case 'manager':
-            return ['qa', 'developer'].includes(requestedRole);
-          default:
-            return false;
-        }
-      };
-
-      if (!canAccessRole(currentUser.role, role)) {
+      if (!canManageRole(currentUser.role, role)) {
         return res.status(403).json({
           message: `Access denied: You cannot view ${role} users`
         });
@@ -233,36 +222,14 @@ async function handleUpdateUser(req, res) {
       });
     }
 
-    const canUpdateRole = (currentUserRole, targetUserRole) => {
-      switch (currentUserRole) {
-        case 'admin':
-          return ['manager', 'qa', 'developer'].includes(targetUserRole);
-        case 'manager':
-          return ['qa', 'developer'].includes(targetUserRole);
-        default:
-          return false;
-      }
-    };
-
-    if (!canUpdateRole(currentUser.role, user.role)) {
+    if (!canManageRole(currentUser.role, user.role)) {
       return res.status(403).json({
         message: `Access denied: You cannot update ${user.role} users`
       });
     }
 
     if (role && role !== user.role) {
-      const canCreateRole = (currentUserRole, requestedRole) => {
-        switch (currentUserRole) {
-          case 'admin':
-            return ['manager', 'qa', 'developer'].includes(requestedRole);
-          case 'manager':
-            return ['qa', 'developer'].includes(requestedRole);
-          default:
-            return false;
-        }
-      };
-
-      if (!canCreateRole(currentUser.role, role)) {
+      if (!canManageRole(currentUser.role, role)) {
         return res.status(403).json({
           message: `Access denied: You cannot assign ${role} role`
         });
@@ -529,18 +496,7 @@ async function handleDeleteUser(req, res) {
       });
     }
 
-    const canDeleteRole = (currentUserRole, targetUserRole) => {
-      switch (currentUserRole) {
-        case 'admin':
-          return ['manager', 'qa', 'developer'].includes(targetUserRole);
-        case 'manager':
-          return ['qa', 'developer'].includes(targetUserRole);
-        default:
-          return false;
-      }
-    };
-
-    if (!canDeleteRole(currentUser.role, user.role)) {
+    if (!canManageRole(currentUser.role, user.role)) {
       return res.status(403).json({
         message: `Access denied: You cannot delete ${user.role} users`
       });

@@ -2,14 +2,34 @@ const Bug = require("../model/bug");
 const Project = require("../model/project");
 const User = require("../model/user");
 
-function serializeBug(bug) {
+const serializeBug = (bug) => {
   const bugObj = bug.toObject();
   if (bugObj.screenshot && bugObj.screenshot.data) {
     bugObj.screenshot.data = bugObj.screenshot.data.toString('base64');
   }
-
   return bugObj;
-}
+};
+
+const checkProjectAccess = (currentUser, project) => {
+  return currentUser.role === 'admin' ||
+         currentUser.role === 'manager' ||
+         project.qaAssigned.some(qa => qa._id ? qa._id.toString() === currentUser._id.toString() : qa.toString() === currentUser._id.toString()) ||
+         project.developersAssigned.some(dev => dev._id ? dev._id.toString() === currentUser._id.toString() : dev.toString() === currentUser._id.toString());
+};
+
+const isDeveloperInProject = (project, developerId) => {
+  return project.developersAssigned.some(dev => 
+    dev._id ? dev._id.toString() === developerId : dev.toString() === developerId
+  );
+};
+
+const populateBug = async (bug) => {
+  return await bug.populate([
+    { path: 'createdBy', select: 'firstname lastname email role' },
+    { path: 'assignedTo', select: 'firstname lastname email role' },
+    { path: 'projectId', select: 'name' }
+  ]);
+};
 
 async function handleCreateBug(req, res) {
   try {
@@ -44,12 +64,7 @@ async function handleCreateBug(req, res) {
       });
     }
 
-    const hasAccess =
-      currentUser.role === 'admin' ||
-      currentUser.role === 'manager' ||
-      project.qaAssigned.some(qa => qa._id.toString() === currentUser._id.toString());
-
-    if (!hasAccess) {
+    if (!checkProjectAccess(currentUser, project)) {
       return res.status(403).json({
         message: "Access denied: You can only create bugs in projects assigned to you"
       });
@@ -64,11 +79,7 @@ async function handleCreateBug(req, res) {
     let assignedDeveloperId;
 
     if (assignedTo) {
-      const isDeveloperInProject = project.developersAssigned.some(
-        dev => dev._id.toString() === assignedTo
-      );
-
-      if (!isDeveloperInProject) {
+      if (!isDeveloperInProject(project, assignedTo)) {
         return res.status(400).json({
           message: "Assigned developer is not part of this project"
         });
@@ -106,10 +117,7 @@ async function handleCreateBug(req, res) {
 
     const newBug = await Bug.create(bugData);
 
-    await newBug.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'assignedTo', select: 'firstname lastname email role' }
-    ]);
+    await populateBug(newBug);
 
     return res.status(201).json({
       message: 'Bug/Feature created successfully',
@@ -145,13 +153,7 @@ async function handleGetAllBugs(req, res) {
         });
       }
 
-      const hasAccess =
-        currentUser.role === 'admin' ||
-        currentUser.role === 'manager' ||
-        project.qaAssigned.some(qa => qa._id.toString() === currentUser._id.toString()) ||
-        project.developersAssigned.some(dev => dev._id.toString() === currentUser._id.toString());
-
-      if (!hasAccess) {
+      if (!checkProjectAccess(currentUser, project)) {
         return res.status(403).json({
           message: "Access denied: You can only view bugs in projects assigned to you"
         });
@@ -224,13 +226,7 @@ async function handleGetBugById(req, res) {
     }
 
     const project = bug.projectId;
-    const hasAccess =
-      currentUser.role === 'admin' ||
-      currentUser.role === 'manager' ||
-      project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString()) ||
-      project.developersAssigned.some(dev => dev.toString() === currentUser._id.toString());
-
-    if (!hasAccess) {
+    if (!checkProjectAccess(currentUser, project)) {
       return res.status(403).json({
         message: "Access denied: You can only view bugs in projects assigned to you"
       });
@@ -274,13 +270,7 @@ async function handleUpdateBug(req, res) {
     }
 
     const project = bug.projectId;
-    const hasAccess =
-      currentUser.role === 'admin' ||
-      currentUser.role === 'manager' ||
-      project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString()) ||
-      project.developersAssigned.some(dev => dev.toString() === currentUser._id.toString());
-
-    if (!hasAccess) {
+    if (!checkProjectAccess(currentUser, project)) {
       return res.status(403).json({
         message: "Access denied: You can only update bugs in projects assigned to you"
       });
@@ -302,11 +292,7 @@ async function handleUpdateBug(req, res) {
       if (deadline !== undefined) bug.deadline = deadline;
 
       if (assignedTo) {
-        const isDeveloperInProject = project.developersAssigned.some(
-          dev => dev._id.toString() === assignedTo
-        );
-
-        if (!isDeveloperInProject) {
+        if (!isDeveloperInProject(project, assignedTo)) {
           return res.status(400).json({
             message: "Assigned developer must be part of this project"
           });
@@ -325,11 +311,7 @@ async function handleUpdateBug(req, res) {
 
     await bug.save();
 
-    await bug.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'assignedTo', select: 'firstname lastname email role' },
-      { path: 'projectId', select: 'name' }
-    ]);
+    await populateBug(bug);
 
     return res.status(200).json({
       message: 'Bug updated successfully',
@@ -368,7 +350,7 @@ async function handleDeleteBug(req, res) {
     }
 
     const project = bug.projectId;
-    const hasAccess =
+    const hasAccess = 
       currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString());
@@ -424,13 +406,7 @@ async function handleUpdateBugStatus(req, res) {
     }
 
     const project = bug.projectId;
-    const hasAccess =
-      currentUser.role === 'admin' ||
-      currentUser.role === 'manager' ||
-      project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString()) ||
-      project.developersAssigned.some(dev => dev.toString() === currentUser._id.toString());
-
-    if (!hasAccess) {
+    if (!checkProjectAccess(currentUser, project)) {
       return res.status(403).json({
         message: "Access denied: You can only update bugs in projects assigned to you"
       });
@@ -439,11 +415,7 @@ async function handleUpdateBugStatus(req, res) {
     bug.status = status;
     await bug.save();
 
-    await bug.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'assignedTo', select: 'firstname lastname email role' },
-      { path: 'projectId', select: 'name' }
-    ]);
+    await populateBug(bug);
 
     return res.status(200).json({
       message: 'Bug status updated successfully',
@@ -489,7 +461,7 @@ async function handleReassignBug(req, res) {
     }
 
     const project = bug.projectId;
-    const hasAccess =
+    const hasAccess = 
       currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
       project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString());
@@ -500,11 +472,7 @@ async function handleReassignBug(req, res) {
       });
     }
 
-    const isDeveloperInProject = project.developersAssigned.some(
-      dev => dev.toString() === assignedTo
-    );
-
-    if (!isDeveloperInProject) {
+    if (!isDeveloperInProject(project, assignedTo)) {
       return res.status(400).json({
         message: "Assigned developer is not part of this project"
       });
@@ -520,11 +488,7 @@ async function handleReassignBug(req, res) {
     bug.assignedTo = assignedTo;
     await bug.save();
 
-    await bug.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'assignedTo', select: 'firstname lastname email role' },
-      { path: 'projectId', select: 'name' }
-    ]);
+    await populateBug(bug);
 
     return res.status(200).json({
       message: 'Bug reassigned successfully',

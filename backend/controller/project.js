@@ -1,7 +1,7 @@
 const Project = require("../model/project");
 const User = require("../model/user");
 
-function serializeProject(projectDoc) {
+const serializeProject = (projectDoc) => {
   if (!projectDoc) return projectDoc;
   const project = projectDoc.toObject ? projectDoc.toObject() : projectDoc;
 
@@ -50,33 +50,79 @@ function serializeProject(projectDoc) {
   }
 
   return project;
-}
+};
+
+const validateQAUsers = async (qaIds) => {
+  if (!qaIds || qaIds.length === 0) return true;
+  
+  for (const qaId of qaIds) {
+    const qaUser = await User.findById(qaId);
+    if (!qaUser || qaUser.role !== 'qa') {
+      throw new Error(`Invalid QA user ID: ${qaId}`);
+    }
+  }
+  return true;
+};
+
+const validateDeveloperUsers = async (developerIds) => {
+  if (!developerIds || developerIds.length === 0) return true;
+  
+  for (const devId of developerIds) {
+    const devUser = await User.findById(devId);
+    if (!devUser || devUser.role !== 'developer') {
+      throw new Error(`Invalid developer user ID: ${devId}`);
+    }
+  }
+  return true;
+};
+
+const populateProject = async (project) => {
+  return await project.populate([
+    { path: 'createdBy', select: 'firstname lastname email role' },
+    { path: 'qaAssigned', select: 'firstname lastname email role' },
+    { path: 'developersAssigned', select: 'firstname lastname email role' }
+  ]);
+};
+
+const populateProjectWithPictures = async (project) => {
+  return await project.populate([
+    { path: 'createdBy', select: 'firstname lastname email role picture' },
+    { path: 'qaAssigned', select: 'firstname lastname email role picture' },
+    { path: 'developersAssigned', select: 'firstname lastname email role picture' }
+  ]);
+};
+
+const validateImageFile = (file) => {
+  if (!file.mimetype.startsWith('image/')) {
+    throw new Error('Only image files are allowed for project picture');
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Project picture must be less than 5MB');
+  }
+};
+
+const parseArrayField = (fieldValue) => {
+  if (!fieldValue) return [];
+  
+  try {
+    return Array.isArray(fieldValue) ? fieldValue : JSON.parse(fieldValue);
+  } catch (_) {
+    return [];
+  }
+};
+
+const checkQARequired = (qaAssigned, currentProjectQA = []) => {
+  const finalQA = qaAssigned || currentProjectQA;
+  if (!finalQA || finalQA.length === 0) {
+    throw new Error("Developers cannot be assigned before QA team members");
+  }
+};
 
 async function handleCreateProject(req, res) {
   try {
     const { name, description } = req.body;
-    let qaAssigned = [];
-    let developersAssigned = [];
-
-    if (req.body.qaAssigned) {
-      try {
-        qaAssigned = Array.isArray(req.body.qaAssigned)
-          ? req.body.qaAssigned
-          : JSON.parse(req.body.qaAssigned);
-      } catch (_) {
-        qaAssigned = [];
-      }
-    }
-
-    if (req.body.developersAssigned) {
-      try {
-        developersAssigned = Array.isArray(req.body.developersAssigned)
-          ? req.body.developersAssigned
-          : JSON.parse(req.body.developersAssigned);
-      } catch (_) {
-        developersAssigned = [];
-      }
-    }
+    const qaAssigned = parseArrayField(req.body.qaAssigned);
+    const developersAssigned = parseArrayField(req.body.developersAssigned);
 
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
@@ -91,32 +137,11 @@ async function handleCreateProject(req, res) {
       });
     }
 
-    if (qaAssigned && qaAssigned.length > 0) {
-      for (const qaId of qaAssigned) {
-        const qaUser = await User.findById(qaId);
-        if (!qaUser || qaUser.role !== 'qa') {
-          return res.status(400).json({
-            message: `Invalid QA user ID: ${qaId}`
-          });
-        }
-      }
-    }
+    await validateQAUsers(qaAssigned);
 
-    if (developersAssigned && developersAssigned.length > 0) {
-      if (!qaAssigned || qaAssigned.length === 0) {
-        return res.status(400).json({
-          message: "Developers cannot be assigned before QA team members"
-        });
-      }
-
-      for (const devId of developersAssigned) {
-        const devUser = await User.findById(devId);
-        if (!devUser || devUser.role !== 'developer') {
-          return res.status(400).json({
-            message: `Invalid developer user ID: ${devId}`
-          });
-        }
-      }
+    if (developersAssigned.length > 0) {
+      checkQARequired(qaAssigned);
+      await validateDeveloperUsers(developersAssigned);
     }
 
     const projectData = {
@@ -128,25 +153,20 @@ async function handleCreateProject(req, res) {
     };
 
     if (req.file) {
-      if (!req.file.mimetype.startsWith('image/')) {
-        return res.status(400).json({ message: 'Only image files are allowed for project picture' });
+      try {
+        validateImageFile(req.file);
+        projectData.picture = {
+          data: req.file.buffer,
+          contentType: req.file.mimetype,
+        };
+      } catch (error) {
+        return res.status(400).json({ message: error.message });
       }
-      if (req.file.size > 5 * 1024 * 1024) {
-        return res.status(400).json({ message: 'Project picture must be less than 5MB' });
-      }
-      projectData.picture = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype,
-      };
     }
 
     const newProject = await Project.create(projectData);
 
-    await newProject.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'qaAssigned', select: 'firstname lastname email role' },
-      { path: 'developersAssigned', select: 'firstname lastname email role' }
-    ]);
+    await populateProject(newProject);
 
     return res.status(201).json({
       message: 'Project created successfully',
@@ -154,6 +174,9 @@ async function handleCreateProject(req, res) {
     });
   } catch (error) {
     console.error("Create project error:", error);
+    if (error.message.includes('Invalid QA user ID') || error.message.includes('Invalid developer user ID') || error.message.includes('QA team members')) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: "Internal server error while creating project" });
   }
 }
@@ -262,27 +285,8 @@ async function handleUpdateProject(req, res) {
   try {
     const { projectId } = req.params;
     const { name, description } = req.body;
-    let qaAssigned = undefined;
-    let developersAssigned = undefined;
-
-    if (req.body.qaAssigned !== undefined) {
-      try {
-        qaAssigned = Array.isArray(req.body.qaAssigned)
-          ? req.body.qaAssigned
-          : JSON.parse(req.body.qaAssigned);
-      } catch (_) {
-        qaAssigned = [];
-      }
-    }
-    if (req.body.developersAssigned !== undefined) {
-      try {
-        developersAssigned = Array.isArray(req.body.developersAssigned)
-          ? req.body.developersAssigned
-          : JSON.parse(req.body.developersAssigned);
-      } catch (_) {
-        developersAssigned = [];
-      }
-    }
+    const qaAssigned = req.body.qaAssigned !== undefined ? parseArrayField(req.body.qaAssigned) : undefined;
+    const developersAssigned = req.body.developersAssigned !== undefined ? parseArrayField(req.body.developersAssigned) : undefined;
 
     const currentUser = req.managerOrAdminUser;
     if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
@@ -305,32 +309,12 @@ async function handleUpdateProject(req, res) {
     }
 
     if (qaAssigned && qaAssigned.length > 0) {
-      for (const qaId of qaAssigned) {
-        const qaUser = await User.findById(qaId);
-        if (!qaUser || qaUser.role !== 'qa') {
-          return res.status(400).json({
-            message: `Invalid QA user ID: ${qaId}`
-          });
-        }
-      }
+      await validateQAUsers(qaAssigned);
     }
 
     if (developersAssigned && developersAssigned.length > 0) {
-      const finalQaAssigned = qaAssigned || project.qaAssigned;
-      if (!finalQaAssigned || finalQaAssigned.length === 0) {
-        return res.status(400).json({
-          message: "Developers cannot be assigned before QA team members"
-        });
-      }
-
-      for (const devId of developersAssigned) {
-        const devUser = await User.findById(devId);
-        if (!devUser || devUser.role !== 'developer') {
-          return res.status(400).json({
-            message: `Invalid developer user ID: ${devId}`
-          });
-        }
-      }
+      checkQARequired(qaAssigned, project.qaAssigned);
+      await validateDeveloperUsers(developersAssigned);
     }
 
     if (name) project.name = name;
@@ -339,25 +323,20 @@ async function handleUpdateProject(req, res) {
     if (developersAssigned !== undefined) project.developersAssigned = developersAssigned;
 
     if (req.file) {
-      if (!req.file.mimetype.startsWith('image/')) {
-        return res.status(400).json({ message: 'Only image files are allowed for project picture' });
+      try {
+        validateImageFile(req.file);
+        project.picture = {
+          data: req.file.buffer,
+          contentType: req.file.mimetype,
+        };
+      } catch (error) {
+        return res.status(400).json({ message: error.message });
       }
-      if (req.file.size > 5 * 1024 * 1024) {
-        return res.status(400).json({ message: 'Project picture must be less than 5MB' });
-      }
-      project.picture = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype,
-      };
     }
 
     await project.save();
 
-    await project.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'qaAssigned', select: 'firstname lastname email role' },
-      { path: 'developersAssigned', select: 'firstname lastname email role' }
-    ]);
+    await populateProject(project);
 
     return res.status(200).json({
       message: 'Project updated successfully',
@@ -365,6 +344,9 @@ async function handleUpdateProject(req, res) {
     });
   } catch (error) {
     console.error("Update project error:", error);
+    if (error.message.includes('Invalid QA user ID') || error.message.includes('Invalid developer user ID') || error.message.includes('QA team members')) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: "Internal server error while updating project" });
   }
 }
@@ -435,23 +417,12 @@ async function handleAssignQA(req, res) {
       });
     }
 
-    for (const qaId of qaIds) {
-      const qaUser = await User.findById(qaId);
-      if (!qaUser || qaUser.role !== 'qa') {
-        return res.status(400).json({
-          message: `Invalid QA user ID: ${qaId}`
-        });
-      }
-    }
+    await validateQAUsers(qaIds);
 
     project.qaAssigned = qaIds;
     await project.save();
 
-    await project.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'qaAssigned', select: 'firstname lastname email role' },
-      { path: 'developersAssigned', select: 'firstname lastname email role' }
-    ]);
+    await populateProject(project);
 
     return res.status(200).json({
       message: 'QA team assigned successfully',
@@ -459,6 +430,9 @@ async function handleAssignQA(req, res) {
     });
   } catch (error) {
     console.error("Assign QA error:", error);
+    if (error.message.includes('Invalid QA user ID')) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: "Internal server error while assigning QA" });
   }
 }
@@ -494,29 +468,13 @@ async function handleAssignDevelopers(req, res) {
       });
     }
 
-    if (!project.qaAssigned || project.qaAssigned.length === 0) {
-      return res.status(400).json({
-        message: "Developers cannot be assigned before QA team members"
-      });
-    }
-
-    for (const devId of developerIds) {
-      const devUser = await User.findById(devId);
-      if (!devUser || devUser.role !== 'developer') {
-        return res.status(400).json({
-          message: `Invalid developer user ID: ${devId}`
-        });
-      }
-    }
+    checkQARequired(undefined, project.qaAssigned);
+    await validateDeveloperUsers(developerIds);
 
     project.developersAssigned = developerIds;
     await project.save();
 
-    await project.populate([
-      { path: 'createdBy', select: 'firstname lastname email role' },
-      { path: 'qaAssigned', select: 'firstname lastname email role' },
-      { path: 'developersAssigned', select: 'firstname lastname email role' }
-    ]);
+    await populateProject(project);
 
     return res.status(200).json({
       message: 'Developers assigned successfully',
@@ -524,6 +482,9 @@ async function handleAssignDevelopers(req, res) {
     });
   } catch (error) {
     console.error("Assign developers error:", error);
+    if (error.message.includes('Invalid developer user ID') || error.message.includes('QA team members')) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: "Internal server error while assigning developers" });
   }
 }
