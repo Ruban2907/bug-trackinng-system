@@ -52,7 +52,7 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         toast.error('File size must be less than 5MB');
         return;
       }
@@ -62,7 +62,7 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.title.trim() || !formData.type) {
       toast.error('Title and type are required');
       return;
@@ -70,21 +70,21 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
 
     try {
       setIsSubmitting(true);
-      
+
       const formDataToSend = new FormData();
       formDataToSend.append('title', formData.title.trim());
       formDataToSend.append('type', formData.type);
       formDataToSend.append('description', formData.description.trim());
       formDataToSend.append('status', formData.status);
-      
+
       if (formData.deadline) {
         formDataToSend.append('deadline', formData.deadline);
       }
-      
+
       if (formData.assignedTo) {
         formDataToSend.append('assignedTo', formData.assignedTo);
       }
-      
+
       if (screenshot) {
         formDataToSend.append('screenshot', screenshot);
       }
@@ -109,8 +109,6 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
 
   const removeScreenshot = () => {
     setScreenshot(null);
-    // Note: To actually remove the screenshot from the backend, you'd need to send a special flag
-    // For now, we'll just clear the local state
   };
 
   if (!isOpen || !bug) {
@@ -249,7 +247,7 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-500 mt-1">Max size: 5MB. Supported formats: JPG, PNG, GIF</p>
-              
+
               {bug.screenshot && (
                 <div className="mt-2">
                   <p className="text-sm text-gray-600 mb-2">Current screenshot:</p>

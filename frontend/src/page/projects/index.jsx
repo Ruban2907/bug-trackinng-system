@@ -21,12 +21,10 @@ const Projects = () => {
   const [userInfo, setUserInfo] = useState(null);
   const navigate = useNavigate();
 
-  // Check user role and redirect if not admin/manager
   useEffect(() => {
     const user = getUserInfo();
     if (user) {
       setUserInfo(user);
-      // Redirect QA and developers to their my-projects page
       if (user.role === 'qa' || user.role === 'developer') {
         navigate('/my-projects', { replace: true });
         return;
@@ -48,7 +46,6 @@ const Projects = () => {
       if (!projectsRes.ok) throw new Error(projectsData.message || 'Failed to load projects');
       if (!usersRes.ok) throw new Error(usersData.message || 'Failed to load users');
 
-      // Load all roles for dropdowns (manager/admin have access to dev and qa)
       const allUsersRes = await apiService.authenticatedRequest('/users');
       const allUsersData = await allUsersRes.json();
       if (!allUsersRes.ok) throw new Error(allUsersData.message || 'Failed to load users');
@@ -56,8 +53,7 @@ const Projects = () => {
       const projectsList = projectsData.projects || [];
       setProjects(projectsList);
       setUsers(allUsersData.users || []);
-      
-      // Fetch bugs for each project
+
       await fetchProjectBugs(projectsList);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -90,7 +86,6 @@ const Projects = () => {
       setProjectBugs(bugsMap);
     } catch (error) {
       console.error('Error fetching project bugs:', error);
-      // Don't show error toast for bugs as it's not critical
     }
   };
 
@@ -99,7 +94,6 @@ const Projects = () => {
   }, []);
 
   useEffect(() => {
-    // Empty effect for editingProject dependency
   }, [editingProject]);
 
   const handleCreateProject = async (formData) => {
@@ -110,13 +104,13 @@ const Projects = () => {
       }
       const res = await apiService.createProject(formData);
       const data = await res.json();
-      
+
       if (!res.ok) {
         toast.error(data.message || 'Failed to create project');
       } else {
         toast.success('Project created successfully!');
         setIsModalOpen(false);
-        fetchData(); // Refresh the list
+        fetchData();
       }
     } catch (error) {
       console.error('Error creating project:', error);
@@ -136,13 +130,13 @@ const Projects = () => {
       }
       const res = await apiService.updateProject(projectId, formData);
       const data = await res.json();
-      
+
       if (!res.ok) {
         toast.error(data.message || 'Failed to update project');
       } else {
         toast.success('Project updated successfully!');
         setEditingProject(null);
-        fetchData(); // Refresh the list
+        fetchData();
       }
     } catch (error) {
       console.error('Error updating project:', error);
@@ -164,12 +158,12 @@ const Projects = () => {
       toast.error('Invalid project data');
       return;
     }
-    
+
     setDeletingProject(projectToDelete._id);
     try {
       const res = await apiService.deleteProject(projectToDelete._id);
       const data = await res.json();
-      
+
       if (!res.ok) {
         toast.error(data.message || 'Failed to delete project');
       } else {
@@ -204,11 +198,9 @@ const Projects = () => {
     }
   };
 
-  // Filter users by role for dropdowns
   const qaUsers = useMemo(() => users.filter(user => user.role === 'qa'), [users]);
   const developerUsers = useMemo(() => users.filter(user => user.role === 'developer'), [users]);
-  
-  // Show loading while checking user role
+
   if (!userInfo) {
     return (
       <Layout>
@@ -229,9 +221,21 @@ const Projects = () => {
       {/* Header */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-            <p className="text-gray-600 mt-1">Manage your projects and assign team members.</p>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="font-medium">Back to Dashboard</span>
+            </button>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+              <p className="text-gray-600 mt-1">Manage your projects and assign team members.</p>
+            </div>
           </div>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -270,7 +274,7 @@ const Projects = () => {
               bugsCount={projectBugs[project._id]?.length || 0}
             />
           ))}
-          
+
           {projects.length === 0 && (
             <div className="col-span-full bg-white rounded-lg shadow p-6 text-center text-gray-600">
               <p className="text-lg">No projects found.</p>
@@ -291,7 +295,7 @@ const Projects = () => {
             console.error('Error closing modal:', error);
           }
         }}
-        onSubmit={editingProject ? 
+        onSubmit={editingProject ?
           (formData) => {
             try {
               if (!editingProject || !editingProject._id) {
@@ -303,7 +307,7 @@ const Projects = () => {
               console.error('Error submitting update:', error);
               toast.error('Failed to submit update');
             }
-          } : 
+          } :
           (formData) => {
             try {
               handleCreateProject(formData);
@@ -317,17 +321,8 @@ const Projects = () => {
         qaUsers={qaUsers}
         developerUsers={developerUsers}
       />
-      
-      {/* Debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 right-4 bg-black bg-opacity-75 text-white p-4 rounded text-xs">
-          <div>Modal Open: {isModalOpen ? 'Yes' : 'No'}</div>
-          <div>Editing Project: {editingProject ? editingProject._id : 'None'}</div>
-          <div>Users Count: {users.length}</div>
-          <div>QA Users: {qaUsers.length}</div>
-          <div>Dev Users: {developerUsers.length}</div>
-        </div>
-      )}
+
+
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal

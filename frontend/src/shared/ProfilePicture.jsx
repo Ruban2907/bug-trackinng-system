@@ -3,8 +3,7 @@ import { getProfilePictureUrl } from '../utils/imageUtils';
 
 const ProfilePicture = ({ user, size = 'md', className = '' }) => {
   const profilePictureUrl = getProfilePictureUrl(user);
-  
-  // Size classes
+
   const sizeClasses = {
     xs: 'w-6 h-6 text-xs',
     sm: 'w-8 h-8 text-sm',
@@ -24,16 +23,14 @@ const ProfilePicture = ({ user, size = 'md', className = '' }) => {
           alt={`${user?.firstname || 'User'} ${user?.lastname || ''}`}
           className="w-full h-full object-cover"
           onError={(e) => {
-            // Fallback to initials if image fails to load
             e.target.style.display = 'none';
             e.target.nextSibling.style.display = 'flex';
           }}
         />
       ) : null}
-      <div 
-        className={`w-full h-full flex items-center justify-center text-blue-600 font-medium ${
-          profilePictureUrl ? 'hidden' : 'flex'
-        }`}
+      <div
+        className={`w-full h-full flex items-center justify-center text-blue-600 font-medium ${profilePictureUrl ? 'hidden' : 'flex'
+          }`}
         style={{ backgroundColor: '#EBF4FF' }}
       >
         {user?.firstname?.charAt(0)}{user?.lastname?.charAt(0)}

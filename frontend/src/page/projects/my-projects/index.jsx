@@ -28,9 +28,7 @@ const MyProjects = () => {
     const user = getUserInfo();
     if (user) {
       setUserInfo(user);
-      // Only QA and developers should access this page
       if (user.role === 'admin' || user.role === 'manager') {
-        // Redirect to main projects page
         navigate('/projects', { replace: true });
         return;
       }
@@ -55,8 +53,7 @@ const MyProjects = () => {
       const projectsData = await projectsRes.json();
       const projectsList = projectsData.projects || [];
       setProjects(projectsList);
-      
-      // Fetch bugs for each project
+
       await fetchProjectBugs(projectsList);
     } catch (err) {
       toast.error(err.message);
@@ -102,11 +99,10 @@ const MyProjects = () => {
   };
 
   const handleBugUpdated = (updatedBug) => {
-    // Update the bug in the projectBugs state
     setProjectBugs(prev => {
       const newState = { ...prev };
       Object.keys(newState).forEach(projectId => {
-        newState[projectId] = newState[projectId].map(bug => 
+        newState[projectId] = newState[projectId].map(bug =>
           bug._id === updatedBug._id ? updatedBug : bug
         );
       });
@@ -122,17 +118,16 @@ const MyProjects = () => {
 
   const handleBugDeleteConfirm = async () => {
     if (!bugToDelete) return;
-    
+
     setDeletingBug(bugToDelete._id);
     try {
       const res = await apiService.deleteBug(bugToDelete._id);
       const data = await res.json();
-      
+
       if (!res.ok) {
         toast.error(data.message || 'Failed to delete bug');
       } else {
         toast.success('Bug deleted successfully');
-        // Remove the bug from projectBugs state
         setProjectBugs(prev => {
           const newState = { ...prev };
           Object.keys(newState).forEach(projectId => {
@@ -163,21 +158,20 @@ const MyProjects = () => {
 
   const handleBugReassignConfirm = async (newAssignee) => {
     if (!bugToReassign) return;
-    
+
     setReassigningBug(bugToReassign._id);
     try {
       const res = await apiService.reassignBug(bugToReassign._id, newAssignee);
       const data = await res.json();
-      
+
       if (!res.ok) {
         toast.error(data.message || 'Failed to reassign bug');
       } else {
         toast.success('Bug reassigned successfully');
-        // Update the bug in projectBugs state
         setProjectBugs(prev => {
           const newState = { ...prev };
           Object.keys(newState).forEach(projectId => {
-            newState[projectId] = newState[projectId].map(bug => 
+            newState[projectId] = newState[projectId].map(bug =>
               bug._id === bugToReassign._id ? { ...bug, assignedTo: newAssignee } : bug
             );
           });
@@ -199,7 +193,6 @@ const MyProjects = () => {
     setBugToReassign(null);
   };
 
-  // Inline reassign handler for BugCard (used by QA view)
   const handleInlineReassign = async (bugId, newAssignee) => {
     if (!bugId || !newAssignee) return;
     setReassigningBug(bugId);
@@ -232,14 +225,13 @@ const MyProjects = () => {
     try {
       const response = await apiService.updateBugStatus(bugId, newStatus);
       const data = await response.json();
-      
+
       if (response.ok) {
         toast.success('Bug status updated successfully');
-        // Update the bug in projectBugs state
         setProjectBugs(prev => {
           const newState = { ...prev };
           Object.keys(newState).forEach(projectId => {
-            newState[projectId] = newState[projectId].map(bug => 
+            newState[projectId] = newState[projectId].map(bug =>
               bug._id === bugId ? { ...bug, status: newStatus } : bug
             );
           });
@@ -254,7 +246,7 @@ const MyProjects = () => {
     }
   };
 
-  // Show loading while checking user role
+
   if (!userInfo) {
     return (
       <Layout>
@@ -277,13 +269,13 @@ const MyProjects = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => window.history.back()}
+              onClick={() => window.location.href = "/dashboard"}
               className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              <span className="font-medium">Back</span>
+              <span className="font-medium">Back to Dashboard</span>
             </button>
             <div className="h-6 w-px bg-gray-300"></div>
             <div>
@@ -302,18 +294,18 @@ const MyProjects = () => {
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {projects.map(project => (
             <div key={project._id} className="bg-white rounded-lg shadow p-6">
-              <ProjectCard 
-                project={project} 
+              <ProjectCard
+                project={project}
                 showEditDelete={false}
                 showDetails={false}
                 bugsCount={projectBugs[project._id]?.length || 0}
               />
-              
+
               {/* Project Bugs Section */}
               {projectBugs[project._id] && projectBugs[project._id].length > 0 && (
                 <div className="mt-6 border-t pt-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Bugs</h3>
-                  
+
                   <div className="space-y-4">
                     {projectBugs[project._id].map(bug => (
                       userInfo.role === 'qa' ? (
@@ -350,7 +342,7 @@ const MyProjects = () => {
               )}
             </div>
           ))}
-          
+
           {projects.length === 0 && (
             <div className="bg-white rounded-lg shadow p-6 text-center text-gray-600">
               <p className="text-lg">No projects assigned to you yet.</p>

@@ -43,7 +43,7 @@ const Bugs = () => {
       } else {
         projectsRes = await apiService.getAssignedProjects();
       }
-      
+
       if (projectsRes.ok) {
         const data = await projectsRes.json();
         setProjects(data.projects || []);
@@ -58,7 +58,7 @@ const Bugs = () => {
       setIsLoading(true);
       const response = await apiService.getBugs(selectedProject);
       const data = await response.json();
-      
+
       if (response.ok) {
         setBugs(data.bugs || []);
       } else {
@@ -98,7 +98,7 @@ const Bugs = () => {
     try {
       const response = await apiService.updateBugStatus(bugId, newStatus);
       const data = await response.json();
-      
+
       if (response.ok) {
         toast.success('Bug status updated successfully');
         handleBugUpdated(data.bug);
@@ -115,7 +115,7 @@ const Bugs = () => {
     try {
       const response = await apiService.reassignBug(bugId, newAssignee);
       const data = await response.json();
-      
+
       if (response.ok) {
         toast.success('Bug reassigned successfully');
         handleBugUpdated(data.bug);
@@ -135,12 +135,12 @@ const Bugs = () => {
 
   const handleDeleteConfirm = async () => {
     if (!bugToDelete) return;
-    
+
     setDeletingBug(bugToDelete._id);
     try {
       const response = await apiService.deleteBug(bugToDelete._id);
       const data = await response.json();
-      
+
       if (response.ok) {
         toast.success('Bug deleted successfully');
         handleBugDeleted(bugToDelete._id);
@@ -177,9 +177,21 @@ const Bugs = () => {
       {/* Header */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Bugs & Features</h1>
-            <p className="text-gray-600 mt-1">Track and manage bugs and feature requests across projects</p>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => window.location.href = "/dashboard"}
+              className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="font-medium">Back to Dashboard</span>
+            </button>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Bugs & Features</h1>
+              <p className="text-gray-600 mt-1">Track and manage bugs and feature requests across projects</p>
+            </div>
           </div>
           {canCreateBug && (
             <button
@@ -209,10 +221,16 @@ const Bugs = () => {
             ))}
           </select>
           <button
-            onClick={fetchBugs}
-            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+            onClick={() => {
+              setIsLoading(true);
+              fetchBugs();
+            }}
+            className="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium flex items-center space-x-2"
           >
-            Refresh
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Refresh</span>
           </button>
         </div>
       </div>
@@ -239,13 +257,13 @@ const Bugs = () => {
               onReassign={handleReassign}
             />
           ))}
-          
+
           {bugs.length === 0 && (
             <div className="bg-white rounded-lg shadow p-6 text-center">
               <div className="text-gray-400 text-6xl mb-4">🐛</div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Bugs Found</h3>
               <p className="text-gray-600">
-                {selectedProject 
+                {selectedProject
                   ? 'No bugs found in the selected project.'
                   : 'No bugs found in your accessible projects.'
                 }

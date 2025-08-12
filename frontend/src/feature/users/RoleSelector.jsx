@@ -47,8 +47,8 @@ const RoleSelector = ({ availableRoles, selectedRole, onRoleSelect, currentUserR
               onClick={() => onRoleSelect(role)}
               className={`
                 p-6 rounded-lg border-2 transition-all duration-200 text-left
-                ${isSelected 
-                  ? 'border-blue-500 bg-blue-50 shadow-md' 
+                ${isSelected
+                  ? 'border-blue-500 bg-blue-50 shadow-md'
                   : `border-gray-200 ${config.color}`
                 }
                 hover:shadow-md transform hover:scale-105

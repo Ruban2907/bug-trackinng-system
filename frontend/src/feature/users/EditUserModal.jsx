@@ -26,13 +26,11 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
   const handlePictureChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         toast.error('Please select an image file');
         return;
       }
 
-      // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         toast.error('Image size should be less than 5MB');
         return;
@@ -40,7 +38,6 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
 
       setPicture(file);
 
-      // Create preview URL
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviewUrl(e.target.result);
@@ -77,7 +74,7 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -273,11 +270,10 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center space-x-2">
               <span className="text-sm font-medium text-gray-700">Role:</span>
-              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
-                user.role === 'qa' ? 'bg-green-100 text-green-800' :
-                'bg-blue-100 text-blue-800'
-              }`}>
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
+                  user.role === 'qa' ? 'bg-green-100 text-green-800' :
+                    'bg-blue-100 text-blue-800'
+                }`}>
                 {getRoleDisplayName(user.role)}
               </span>
             </div>
@@ -298,11 +294,10 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`flex-1 py-2 px-4 rounded-md text-white font-medium ${
-                isLoading
+              className={`flex-1 py-2 px-4 rounded-md text-white font-medium ${isLoading
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700'
-              } transition-colors`}
+                } transition-colors`}
             >
               {isLoading ? 'Updating...' : 'Update User'}
             </button>

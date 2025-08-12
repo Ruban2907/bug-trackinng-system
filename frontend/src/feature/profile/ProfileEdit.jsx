@@ -91,11 +91,11 @@ const ProfileEdit = () => {
         };
         setUserInfo(finalUserInfo);
         setUserInfoState(finalUserInfo);
-        
+
         window.dispatchEvent(new Event('storage'));
-        
+
         toast.success('Profile updated successfully!');
-        
+
         setTimeout(() => {
           navigate("/dashboard");
         }, 1500);
@@ -121,7 +121,7 @@ const ProfileEdit = () => {
     toast.info('Changes cancelled');
   };
 
-  
+
 
   if (!userInfo) {
     return (
@@ -139,7 +139,7 @@ const ProfileEdit = () => {
           onClick={() => navigate("/dashboard")}
           className="text-gray-600 hover:text-gray-800 transition-colors"
         >
-          ← Back to Dashboard
+          ⬅️ Back to Dashboard
         </button>
       </div>
 
@@ -200,7 +200,7 @@ const ProfileEdit = () => {
                     New picture selected: {newPicture.name}
                   </p>
                 )}
-              </div>              
+              </div>
             </div>
           </div>
 
@@ -267,11 +267,10 @@ const ProfileEdit = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`flex-1 py-2 px-4 rounded-md text-white font-medium ${
-                isLoading
+              className={`flex-1 py-2 px-4 rounded-md text-white font-medium ${isLoading
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700'
-              } transition-colors`}
+                } transition-colors`}
             >
               {isLoading ? 'Updating...' : 'Update Profile'}
             </button>

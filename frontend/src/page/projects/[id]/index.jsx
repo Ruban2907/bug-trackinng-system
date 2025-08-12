@@ -43,7 +43,7 @@ const ProjectDetails = () => {
     try {
       const response = await apiService.getProjectById(id);
       const data = await response.json();
-      
+
       if (response.ok) {
         setProject(data.project);
       } else {
@@ -62,7 +62,7 @@ const ProjectDetails = () => {
     try {
       const response = await apiService.authenticatedRequest(`/bugs?projectId=${id}`);
       const data = await response.json();
-      
+
       if (response.ok) {
         setBugs(data.bugs || []);
       } else {
@@ -99,12 +99,12 @@ const ProjectDetails = () => {
 
   const handleBugDeleteConfirm = async () => {
     if (!bugToDelete) return;
-    
+
     setDeletingBug(bugToDelete._id);
     try {
       const res = await apiService.deleteBug(bugToDelete._id);
       const data = await res.json();
-      
+
       if (!res.ok) {
         toast.error(data.message || 'Failed to delete bug');
       } else {
@@ -133,17 +133,17 @@ const ProjectDetails = () => {
 
   const handleBugReassignConfirm = async (newAssignee) => {
     if (!bugToReassign) return;
-    
+
     setReassigningBug(bugToReassign._id);
     try {
       const res = await apiService.reassignBug(bugToReassign._id, newAssignee);
       const data = await res.json();
-      
+
       if (!res.ok) {
         toast.error(data.message || 'Failed to reassign bug');
       } else {
         toast.success('Bug reassigned successfully');
-        setBugs(prev => prev.map(bug => 
+        setBugs(prev => prev.map(bug =>
           bug._id === bugToReassign._id ? { ...bug, assignedTo: newAssignee } : bug
         ));
         setShowReassignModal(false);
@@ -166,10 +166,10 @@ const ProjectDetails = () => {
     try {
       const response = await apiService.updateBugStatus(bugId, newStatus);
       const data = await response.json();
-      
+
       if (response.ok) {
         toast.success('Bug status updated successfully');
-        setBugs(prev => prev.map(bug => 
+        setBugs(prev => prev.map(bug =>
           bug._id === bugId ? { ...bug, status: newStatus } : bug
         ));
       } else {
@@ -188,7 +188,7 @@ const ProjectDetails = () => {
     const newCount = bugs.filter(bug => bug.status === 'new').length;
     const inProgressCount = bugs.filter(bug => bug.status === 'started').length;
     const resolvedCount = bugs.filter(bug => bug.status === 'resolved' || bug.status === 'completed').length;
-    
+
     return { total, bugsCount, featuresCount, newCount, inProgressCount, resolvedCount };
   };
 
@@ -359,7 +359,7 @@ const ProjectDetails = () => {
                   <h4 className="font-medium text-gray-900 mb-2">Description</h4>
                   <p className="text-gray-700 leading-relaxed">{project.description}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 rounded-lg p-4">
                     <h4 className="font-medium text-gray-900 text-sm mb-1">Created By</h4>

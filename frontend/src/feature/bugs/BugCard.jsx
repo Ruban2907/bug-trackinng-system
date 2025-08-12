@@ -6,13 +6,12 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [newAssignee, setNewAssignee] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  
+
   const userInfo = getUserInfo();
   const canEdit = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.role === 'qa');
   const canDelete = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.role === 'qa');
   const canUpdateStatus = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.role === 'qa' || userInfo.role === 'developer');
   const canReassign = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager');
-  // For developers, only show status updates, not reassign
   const canReassignForUser = canReassign && userInfo.role !== 'developer';
 
   const getStatusColor = (status) => {
@@ -29,8 +28,6 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
     return type === 'bug' ? 'bg-red-100 text-red-800' : 'bg-purple-100 text-purple-800';
   };
 
-
-
   const handleStatusUpdate = async (newStatus) => {
     if (onStatusUpdate) {
       await onStatusUpdate(bug._id, newStatus);
@@ -39,7 +36,7 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
 
   const handleReassign = async () => {
     if (!newAssignee) return;
-    
+
     setIsUpdating(true);
     try {
       if (onReassign) {
@@ -114,7 +111,7 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
                     {bug.description || 'No description provided'}
                   </p>
                 </div>
-                
+
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Details</h4>
                   <div className="space-y-2 text-sm">
@@ -152,7 +149,7 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
               {bug.screenshot && bug.screenshot.data ? (
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">Screenshot</h4>
-                  <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">    
+                  <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
                     <img
                       src={`data:${bug.screenshot.contentType};base64,${bug.screenshot.data}`}
                       alt="Bug screenshot"
@@ -176,8 +173,6 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
                 </div>
               )}
             </div>
-            
-
 
             {/* Actions */}
             <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
@@ -201,14 +196,13 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
                   className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="new">New</option>
+                  <option value="started">Started</option>
                   {bug.type === 'bug' ? (
                     <>
-                      <option value="started">Started</option>
                       <option value="resolved">Resolved</option>
                     </>
                   ) : (
                     <>
-                      <option value="started">Started</option>
                       <option value="completed">Completed</option>
                     </>
                   )}
@@ -255,7 +249,7 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Reassign Bug</h3>
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Assign to Developer
@@ -294,8 +288,6 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
           </div>
         </div>
       )}
-
-
     </>
   );
 };

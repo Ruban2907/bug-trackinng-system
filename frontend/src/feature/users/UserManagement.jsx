@@ -24,8 +24,6 @@ const UserManagement = () => {
         return ['manager', 'qa', 'developer'];
       case 'manager':
         return ['qa', 'developer'];
-      case 'qa':
-        return ['developer'];
       default:
         return [];
     }
@@ -125,8 +123,8 @@ const UserManagement = () => {
             </div>
           </div>
           {selectedRole && (
-            // QA can see developers but not create them
-            !(currentUser.role === 'qa' && selectedRole === 'developer') && (
+            // Only admins and managers can create users
+            ['admin', 'manager'].includes(currentUser.role) && (
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"

@@ -4,13 +4,12 @@ import { toast } from 'react-toastify';
 import { getUserInfo } from '../../utils/userUtils';
 
 const BugCreationFlow = ({ onClose, onBugCreated }) => {
-  const [step, setStep] = useState('project-selection'); // 'project-selection' or 'bug-creation'
+  const [step, setStep] = useState('project-selection');
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
-  
-  // Bug form state
+
   const [title, setTitle] = useState('');
   const [type, setType] = useState('bug'); // 'bug' or 'feature'
   const [description, setDescription] = useState('');
@@ -36,13 +35,13 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
     try {
       setIsLoading(true);
       let projectsRes;
-      
+
       if (userInfo?.role === 'admin' || userInfo?.role === 'manager') {
         projectsRes = await apiService.getProjects();
       } else {
         projectsRes = await apiService.getAssignedProjects();
       }
-      
+
       if (projectsRes.ok) {
         const data = await projectsRes.json();
         setProjects(data.projects || []);
@@ -65,7 +64,6 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
   const handleBackToProjects = () => {
     setStep('project-selection');
     setSelectedProject(null);
-    // Reset form
     setTitle('');
     setType('bug');
     setDescription('');
@@ -76,7 +74,7 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!title.trim() || !type) {
       toast.error('Title and type are required');
       return;
@@ -84,21 +82,21 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
 
     try {
       setIsSubmitting(true);
-      
+
       const formData = new FormData();
       formData.append('title', title.trim());
       formData.append('type', type);
       formData.append('description', description.trim());
       formData.append('projectId', selectedProject._id);
-      
+
       if (deadline) {
         formData.append('deadline', deadline);
       }
-      
+
       if (assignedTo) {
         formData.append('assignedTo', assignedTo);
       }
-      
+
       if (screenshot) {
         formData.append('screenshot', screenshot);
       }
@@ -124,7 +122,7 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         toast.error('File size must be less than 5MB');
         return;
       }
@@ -148,7 +146,7 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
                 </svg>
               </button>
             </div>
-            
+
             <p className="text-gray-600 mb-6">
               Choose a project to create a bug or feature in. Only projects you have access to are shown.
             </p>
@@ -180,7 +178,7 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
                     </div>
                   </div>
                 ))}
-                
+
                 {projects.length === 0 && (
                   <div className="col-span-full text-center py-8 text-gray-500">
                     No projects available. Contact your manager to get assigned to projects.
@@ -194,7 +192,6 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
     );
   }
 
-  // Bug creation form
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">

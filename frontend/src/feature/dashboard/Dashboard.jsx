@@ -36,12 +36,10 @@ const DashboardPage = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Fetch dashboard statistics function
   const fetchDashboardStats = async () => {
     try {
       setIsLoading(true);
-      
-      // Fetch projects count (only for admin/manager)
+
       if (userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager')) {
         const projectsRes = await apiService.authenticatedRequest('/projects');
         if (projectsRes.ok) {
@@ -51,50 +49,45 @@ const DashboardPage = () => {
             totalProjects: projectsData.projects?.length || 0
           }));
         }
-        
+
 
       }
-      
-      // Fetch assigned projects count for QA and developers
+
       if (userInfo && (userInfo.role === 'qa' || userInfo.role === 'developer')) {
         const projectsRes = await apiService.authenticatedRequest('/assigned-projects');
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json();
           const projects = projectsData.projects || [];
-          
+
           setDashboardStats(prev => ({
             ...prev,
             totalProjects: projects.length
           }));
         }
       }
-      
-      // Fetch bugs count based on user role and access
+
       let bugs = [];
-      
+
       if (userInfo.role === 'admin' || userInfo.role === 'manager') {
-        // Admins and managers can see all bugs
         const bugsRes = await apiService.authenticatedRequest('/bugs');
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
           bugs = bugsData.bugs || [];
         }
       } else {
-        // QA and developers can only see bugs from their assigned projects
         const bugsRes = await apiService.authenticatedRequest('/bugs');
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
           bugs = bugsData.bugs || [];
         }
       }
-      
-      // Count different bug statuses
+
       const activeBugs = bugs.filter(bug => bug.status === 'new' || bug.status === 'started').length;
       const resolvedIssues = bugs.filter(bug => bug.status === 'resolved' || bug.status === 'completed').length;
       const pendingFeatures = bugs.filter(bug => bug.type === 'feature' && bug.status !== 'completed').length;
-      
 
-      
+
+
       setDashboardStats(prev => ({
         ...prev,
         activeBugs,
@@ -109,7 +102,6 @@ const DashboardPage = () => {
     }
   };
 
-  // Fetch dashboard statistics on component mount
   useEffect(() => {
     if (userInfo) {
       fetchDashboardStats();
@@ -157,7 +149,7 @@ const DashboardPage = () => {
             <span>Refresh</span>
           </button>
         </div>
-        
+
         <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
@@ -182,9 +174,9 @@ const DashboardPage = () => {
                 </div>
                 <div className="mt-4">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {userInfo.role === 'admin' ? 'Administrator' : 
-                     userInfo.role === 'manager' ? 'Project Manager' :
-                     userInfo.role === 'qa' ? 'Quality Assurance' : 'Developer'}
+                    {userInfo.role === 'admin' ? 'Administrator' :
+                      userInfo.role === 'manager' ? 'Project Manager' :
+                        userInfo.role === 'qa' ? 'Quality Assurance' : 'Developer'}
                   </span>
                 </div>
               </div>
@@ -197,8 +189,8 @@ const DashboardPage = () => {
             </button>
           </div>
         </div>
-        
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {(userInfo.role === 'admin' || userInfo.role === 'manager') ? (
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="text-lg font-medium text-blue-900">Total Projects</h3>
@@ -212,17 +204,17 @@ const DashboardPage = () => {
               <p className="text-xs text-blue-600 mt-1">Projects assigned to you</p>
             </div>
           )}
-          
+
           <div className="bg-green-50 p-4 rounded-lg">
             <h3 className="text-lg font-medium text-green-900">
               {userInfo.role === 'developer' ? 'My Active Bugs' : 'Active Bugs'}
             </h3>
             <p className="text-2xl font-bold text-green-600">{dashboardStats.activeBugs}</p>
             <p className="text-xs text-green-600 mt-1">
-                              {userInfo.role === 'developer' ? 'Bugs assigned to you' : 'New & started bugs'}
+              {userInfo.role === 'developer' ? 'Bugs assigned to you' : 'New & started bugs'}
             </p>
           </div>
-          
+
           <div className="bg-yellow-50 p-4 rounded-lg">
             <h3 className="text-lg font-medium text-yellow-900">
               {userInfo.role === 'developer' ? 'My Pending Features' : 'Pending Features'}
@@ -232,7 +224,7 @@ const DashboardPage = () => {
               {userInfo.role === 'developer' ? 'Features assigned to you' : 'Unresolved feature requests'}
             </p>
           </div>
-          
+
           <div className="bg-purple-50 p-4 rounded-lg">
             <h3 className="text-lg font-medium text-purple-900">
               {userInfo.role === 'developer' ? 'My Resolved Issues' : 'Resolved Issues'}
@@ -249,13 +241,13 @@ const DashboardPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
               <>
-                <button 
+                <button
                   onClick={() => navigate("/projects")}
                   className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 transition"
                 >
                   Create Project
                 </button>
-                <button 
+                <button
                   onClick={() => navigate("/users")}
                   className="bg-green-600 text-white p-4 rounded-lg hover:bg-green-700 transition"
                 >
@@ -263,38 +255,38 @@ const DashboardPage = () => {
                 </button>
               </>
             )}
-            
+
             {userInfo.role === 'qa' && (
-              <button 
+              <button
                 onClick={() => navigate("/my-projects")}
                 className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 transition"
               >
                 Show My Projects
               </button>
             )}
-            
+
             {userInfo.role === 'developer' && (
-              <button 
+              <button
                 onClick={() => navigate("/my-projects")}
                 className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 transition"
               >
                 Show My Projects
               </button>
             )}
-            
-                         <button 
-               onClick={() => navigate("/bugs")}
-               className="bg-orange-600 text-white p-4 rounded-lg hover:bg-orange-700 transition"
-             >
-               {userInfo.role === 'developer' ? 'Bug/Feature' : 'Create Bug/Feature'}
-             </button>
+
+            <button
+              onClick={() => navigate("/bugs")}
+              className="bg-orange-600 text-white p-4 rounded-lg hover:bg-orange-700 transition"
+            >
+              {userInfo.role === 'developer' ? 'Bug/Feature' : 'Create Bug/Feature'}
+            </button>
           </div>
         </div>
 
         {/* Role-based Actions Summary */}
         <div className="mt-8 p-6 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions You Can Perform</h3>
-          
+
           {userInfo.role === 'admin' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

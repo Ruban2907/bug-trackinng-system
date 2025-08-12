@@ -1,11 +1,11 @@
 import React from 'react';
-const ConfirmationModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title = "Confirm Action", 
-  message = "Are you sure you want to proceed?", 
-  confirmText = "Confirm", 
+const ConfirmationModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title = "Confirm Action",
+  message = "Are you sure you want to proceed?",
+  confirmText = "Confirm",
   cancelText = "Cancel",
   confirmButtonClass = "bg-red-600 hover:bg-red-700",
   isLoading = false
@@ -16,7 +16,7 @@ const ConfirmationModal = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div 
+        <div
           className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
           onClick={onClose}
         ></div>
@@ -47,11 +47,10 @@ const ConfirmationModal = ({
               type="button"
               onClick={onConfirm}
               disabled={isLoading}
-              className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm transition-colors ${
-                isLoading 
-                  ? 'bg-gray-400 cursor-not-allowed' 
+              className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm transition-colors ${isLoading
+                  ? 'bg-gray-400 cursor-not-allowed'
                   : confirmButtonClass
-              }`}
+                }`}
             >
               {isLoading ? (
                 <>

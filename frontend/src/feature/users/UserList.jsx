@@ -22,7 +22,7 @@ const UserList = ({ users, role, isLoading, onUserUpdated, onUserDeleted, curren
 
   const handleDeleteConfirm = async () => {
     if (!userToDelete) return;
-    
+
     setDeletingUser(userToDelete._id);
     try {
       const response = await apiService.authenticatedRequest(`/users/${userToDelete._id}`, {
@@ -123,11 +123,10 @@ const UserList = ({ users, role, isLoading, onUserUpdated, onUserDeleted, curren
                     <div className="text-sm text-gray-900">{user.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
-                      user.role === 'qa' ? 'bg-green-100 text-green-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'qa' ? 'bg-green-100 text-green-800' :
+                          'bg-blue-100 text-blue-800'
+                      }`}>
                       {getRoleDisplayName(user.role)}
                     </span>
                   </td>
@@ -150,11 +149,10 @@ const UserList = ({ users, role, isLoading, onUserUpdated, onUserDeleted, curren
                         <button
                           onClick={() => handleDeleteClick(user)}
                           disabled={deletingUser === user._id}
-                          className={`transition-colors ${
-                            deletingUser === user._id
+                          className={`transition-colors ${deletingUser === user._id
                               ? 'text-gray-400 cursor-not-allowed'
                               : 'text-red-600 hover:text-red-900'
-                          }`}
+                            }`}
                           title="Delete user"
                         >
                           {deletingUser === user._id ? (

@@ -5,9 +5,9 @@ import { toast } from 'react-toastify';
 import { apiService } from "../../services/api";
 
 const LoginPage = () => {
-  const [form, setForm] = useState({ 
-    email: "", 
-    password: "" 
+  const [form, setForm] = useState({
+    email: "",
+    password: ""
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -53,11 +53,11 @@ const LoginPage = () => {
       if (data.token) {
         localStorage.setItem('token', data.token);
       }
-      
+
       if (data.foundUser) {
         setUserInfo(data.foundUser);
       }
-      
+
       try {
         const userResponse = await apiService.authenticatedRequest('/users/me', {
           method: 'GET'
@@ -69,11 +69,11 @@ const LoginPage = () => {
       } catch (error) {
         console.error('Error fetching user data:', error);
       }
-      
-      
+
+
       navigate("/dashboard");
       toast.success("Login Successful!");
-      
+
     } catch (err) {
       console.error("Login Error: ", err);
       setError(err.message || "Login failed. Please check your credentials.");
@@ -104,7 +104,7 @@ const LoginPage = () => {
 
       setEmailVerified(true);
       toast.success("Email verified! You can now reset your password.");
-      
+
     } catch (err) {
       console.error("Forgot Password Error: ", err);
       setError(err.message || "Email not found in our database.");
@@ -149,7 +149,7 @@ const LoginPage = () => {
         email: forgotEmail,
         newPassword: resetPassword
       });
-      
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -162,7 +162,7 @@ const LoginPage = () => {
       setForgotEmail("");
       setResetPassword("");
       setConfirmPassword("");
-      
+
     } catch (err) {
       console.error("Reset Password Error: ", err);
       setError(err.message || "Password reset failed. Please try again.");
@@ -202,7 +202,7 @@ const LoginPage = () => {
                       required
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-gray-700 mb-1" htmlFor="password">Password *</label>
                     <input
@@ -215,21 +215,20 @@ const LoginPage = () => {
                       required
                     />
                   </div>
-                  
+
                   {error && (
                     <div className="text-red-500 text-sm bg-red-50 p-3 rounded border border-red-200">
                       {error}
                     </div>
                   )}
-                  
+
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className={`w-full py-2 rounded transition ${
-                      isLoading 
-                        ? 'bg-gray-400 cursor-not-allowed' 
+                    className={`w-full py-2 rounded transition ${isLoading
+                        ? 'bg-gray-400 cursor-not-allowed'
                         : 'bg-gray-800 hover:bg-gray-700'
-                    } text-white`}
+                      } text-white`}
                   >
                     {isLoading ? 'Signing In...' : 'Sign In'}
                   </button>
@@ -248,21 +247,20 @@ const LoginPage = () => {
                       required
                     />
                   </div>
-                  
+
                   {error && (
                     <div className="text-red-500 text-sm bg-red-50 p-3 rounded border border-red-200">
                       {error}
                     </div>
                   )}
-                  
+
                   <button
                     type="submit"
                     disabled={forgotLoading}
-                    className={`w-full py-2 rounded transition ${
-                      forgotLoading 
-                        ? 'bg-gray-400 cursor-not-allowed' 
+                    className={`w-full py-2 rounded transition ${forgotLoading
+                        ? 'bg-gray-400 cursor-not-allowed'
                         : 'bg-blue-600 hover:bg-blue-700'
-                    } text-white`}
+                      } text-white`}
                   >
                     {forgotLoading ? 'Verifying...' : 'Verify Email'}
                   </button>
@@ -284,7 +282,7 @@ const LoginPage = () => {
                       Password must be at least 8 characters long and contain at least one capital letter, one lowercase letter, one number, and one special character.
                     </p>
                   </div>
-                  
+
                   <div>
                     <label className="block text-gray-700 mb-1" htmlFor="confirmNewPassword">Confirm New Password *</label>
                     <input
@@ -297,28 +295,27 @@ const LoginPage = () => {
                       required
                     />
                   </div>
-                  
+
                   {error && (
                     <div className="text-red-500 text-sm bg-red-50 p-3 rounded border border-red-200">
                       {error}
                     </div>
                   )}
-                  
+
                   <button
                     type="submit"
                     disabled={resetLoading}
-                    className={`w-full py-2 rounded transition ${
-                      resetLoading 
-                        ? 'bg-gray-400 cursor-not-allowed' 
+                    className={`w-full py-2 rounded transition ${resetLoading
+                        ? 'bg-gray-400 cursor-not-allowed'
                         : 'bg-green-600 hover:bg-green-700'
-                    } text-white`}
+                      } text-white`}
                   >
                     {resetLoading ? 'Resetting Password...' : 'Reset Password'}
                   </button>
                 </form>
               )}
             </div>
-            
+
             <div className="mt-6 text-center text-sm text-gray-600">
               {!showForgotPassword ? (
                 <span
@@ -342,7 +339,7 @@ const LoginPage = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="w-full md:flex-1 bg-gray-100 flex items-center justify-center order-2 md:order-none">
           <img
             src="/public/forget.jpg"

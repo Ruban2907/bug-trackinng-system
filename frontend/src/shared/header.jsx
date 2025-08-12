@@ -13,7 +13,6 @@ const Header = () => {
     setUserInfo(user);
   }, []);
 
-  // Listen for storage changes to update user info
   useEffect(() => {
     const handleStorageChange = () => {
       const user = getUserInfo();
@@ -40,7 +39,7 @@ const Header = () => {
   };
 
   if (!userInfo) {
-    return null; // Don't show header if user is not logged in
+    return null;
   }
 
   return (
@@ -68,7 +67,7 @@ const Header = () => {
             >
               Dashboard
             </button>
-            
+
             {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
               <>
                 <button
@@ -85,7 +84,7 @@ const Header = () => {
                 </button>
               </>
             )}
-            
+
             {(userInfo.role === 'qa' || userInfo.role === 'developer') && (
               <button
                 onClick={() => navigate("/my-projects")}
@@ -94,7 +93,7 @@ const Header = () => {
                 Projects
               </button>
             )}
-            
+
             <button
               onClick={() => navigate("/bugs")}
               className="text-gray-700 hover:text-blue-600 transition-colors font-medium"
@@ -115,7 +114,7 @@ const Header = () => {
                   {userInfo.role}
                 </div>
               </div>
-              
+
               {/* User Avatar */}
               <ProfilePicture user={userInfo} size="sm" />
             </div>
@@ -140,7 +139,7 @@ const Header = () => {
           >
             Dashboard
           </button>
-          
+
           {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
             <>
               <button
@@ -157,7 +156,7 @@ const Header = () => {
               </button>
             </>
           )}
-          
+
           {(userInfo.role === 'qa' || userInfo.role === 'developer') && (
             <button
               onClick={() => navigate("/my-projects")}
@@ -166,7 +165,7 @@ const Header = () => {
               Projects
             </button>
           )}
-          
+
           <button
             onClick={() => navigate("/bugs")}
             className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md"

@@ -26,7 +26,7 @@ const ProjectCard = ({ project, onEdit, onDelete, onShowDetails, showEditDelete 
       onShowDetails(project);
     }
   };
-  
+
   const [showQA, setShowQA] = useState(false);
   const [showDevelopers, setShowDevelopers] = useState(false);
   const pictureUrl = project.picture?.data
@@ -35,20 +35,18 @@ const ProjectCard = ({ project, onEdit, onDelete, onShowDetails, showEditDelete 
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-       {/* Top half - Profile Picture */}
-       <div className="h-60 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="h-60 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         {pictureUrl ? (
           <img src={pictureUrl} alt={project.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center">
             <span className="text-white font-bold text-2xl">
-              {(project.name || 'P')?.slice(0,2)?.toUpperCase()}
+              {(project.name || 'P')?.slice(0, 2)?.toUpperCase()}
             </span>
           </div>
         )}
       </div>
-      
-      {/* Bottom half - Content */}
+
       <div className="p-4 space-y-3">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1">{project.name || 'Unnamed Project'}</h3>
@@ -105,24 +103,24 @@ const ProjectCard = ({ project, onEdit, onDelete, onShowDetails, showEditDelete 
 
         <div className="flex gap-2 justify-end">
           {showEditDelete && onEdit && (
-            <button 
-              onClick={handleEditClick} 
+            <button
+              onClick={handleEditClick}
               className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors"
             >
               Edit
             </button>
           )}
           {showEditDelete && onDelete && (
-            <button 
-              onClick={handleDeleteClick} 
+            <button
+              onClick={handleDeleteClick}
               className="px-3 py-1.5 rounded bg-red-600 text-white text-sm hover:bg-red-700 transition-colors"
             >
               Delete
             </button>
           )}
           {showDetails && onShowDetails && (
-            <button 
-              onClick={handleShowDetails} 
+            <button
+              onClick={handleShowDetails}
               className="px-3 py-1.5 rounded bg-green-600 text-white text-sm hover:bg-green-700 transition-colors"
             >
               Show Details
