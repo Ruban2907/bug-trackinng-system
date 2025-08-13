@@ -1,171 +1,137 @@
 const { getUser } = require("../services/secret");
 const User = require("../model/user");
+const { AuthenticationError, AuthorizationError } = require("../utils/errors");
 
-function authenticate(req, res, next) {
+/**
+ * Base authentication function to extract and verify token
+ * @param {Object} req - Express request object
+ * @returns {Object} User data from token
+ */
+const extractToken = (req) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Unauthorized: No token provided" });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new AuthenticationError('No token provided');
   }
-  const token = authHeader.split(" ")[1];
-  const user = getUser(token);
+  return authHeader.substring(7);
+};
+
+/**
+ * Base authentication function to get user from database
+ * @param {string} userId - User ID from token
+ * @returns {Object} User object from database
+ */
+const getUserFromDb = async (userId) => {
+  const user = await User.findById(userId).select('-password');
   if (!user) {
-    return res.status(401).json({ message: "Unauthorized: Invalid token" });
+    throw new AuthenticationError('User not found');
   }
-  req.user = user;
-  next();
+  return user;
+};
+
+/**
+ * Basic authentication middleware
+ */
+function authenticate(req, res, next) {
+  try {
+    const token = extractToken(req);
+    const decoded = getUser(token);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    next(error);
+  }
 }
 
+/**
+ * Require manager or admin role
+ */
 async function requireManagerOrAdmin(req, res, next) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized: No token provided" });
-    }
-    const token = authHeader.split(" ")[1];
-    const userData = getUser(token);
-    if (!userData) {
-      return res.status(401).json({ message: "Unauthorized: Invalid token" });
-    }
-
-    const user = await User.findById(userData._id);
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
+    const user = await getUserFromDb(req.user._id);
     if (!['admin', 'manager'].includes(user.role)) {
-      return res.status(403).json({
-        message: "Access denied: Only managers and admins can perform this action"
-      });
+      throw new AuthorizationError('Access denied. Manager or Admin role required.');
     }
-
-    req.user = userData;
-    req.managerOrAdminUser = user;
+    req.user = user;
     next();
   } catch (error) {
-    console.error("Manager/Admin authentication error:", error);
-    return res.status(500).json({ message: "Authentication error", error: error.message });
+    next(error);
   }
 }
 
+/**
+ * Require admin role only
+ */
 async function requireAdmin(req, res, next) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized: No token provided" });
-    }
-    const token = authHeader.split(" ")[1];
-
-    const userData = getUser(token);
-
-    if (!userData) {
-      return res.status(401).json({ message: "Unauthorized: Invalid token" });
-    }
-    const user = await User.findById(userData._id);
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
+    const user = await getUserFromDb(req.user._id);
     if (user.role !== 'admin') {
-      return res.status(403).json({ message: "Access denied: Admins only" });
+      throw new AuthorizationError('Access denied. Admin role required.');
     }
-
-    req.user = userData;
-    req.adminUser = user;
+    req.user = user;
     next();
   } catch (error) {
-    console.error("Admin authentication error:", error);
-    return res.status(500).json({ message: "Authentication error", error: error.message });
+    next(error);
   }
 }
 
+/**
+ * Require regular user (non-admin)
+ */
 async function requireUser(req, res, next) {
   try {
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized: No token provided" });
-    }
-    const token = authHeader.split(" ")[1];
-    const userData = getUser(token);
-    if (!userData) {
-      return res.status(401).json({ message: "Unauthorized: Invalid token" });
-    }
-
-    const user = await User.findById(userData._id);
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    if (user.role === 'admin') {
-      return res.status(403).json({ message: "Access denied: Admin users cannot perform this action" });
-    }
-
-    req.user = userData;
-    req.regularUser = user;
+    const user = await getUserFromDb(req.user._id);
+    req.user = user;
     next();
   } catch (error) {
-    console.error("User authentication error:", error);
-    return res.status(500).json({ message: "Authentication error", error: error.message });
+    next(error);
   }
 }
 
+/**
+ * Require any authenticated user
+ */
 async function requireAnyUser(req, res, next) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized: No token provided" });
-    }
-    const token = authHeader.split(" ")[1];
-    const userData = getUser(token);
-    if (!userData) {
-      return res.status(401).json({ message: "Unauthorized: Invalid token" });
-    }
-
-    const user = await User.findById(userData._id);
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    req.user = userData;
-    req.currentUser = user;
+    const user = await getUserFromDb(req.user._id);
+    req.user = user;
     next();
   } catch (error) {
-    console.error("User authentication error:", error);
-    return res.status(500).json({ message: "Authentication error", error: error.message });
+    next(error);
   }
 }
 
+/**
+ * Require admin, manager, or QA role
+ */
 const requireAdminManagerOrQA = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized: No token provided" });
-    }
-    const token = authHeader.split(" ")[1];
-    const userData = getUser(token);
-    if (!userData) {
-      return res.status(401).json({ message: "Unauthorized: Invalid token" });
-    }
-
-    const user = await User.findById(userData._id);
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
+    const user = await getUserFromDb(req.user._id);
     if (!['admin', 'manager', 'qa'].includes(user.role)) {
-      return res.status(403).json({
-        message: "Access denied: Only admins, managers, and QA can access this resource"
-      });
+      throw new AuthorizationError('Access denied. Admin, Manager, or QA role required.');
     }
-
-    req.user = userData;
-    req.currentUser = user;
+    req.user = user;
     next();
   } catch (error) {
-    console.error('requireAdminManagerOrQA error:', error);
-    res.status(500).json({ message: "Internal server error" });
+    next(error);
   }
+};
+
+/**
+ * Flexible role-based access control
+ */
+const requireRole = (allowedRoles) => {
+  return async (req, res, next) => {
+    try {
+      const user = await getUserFromDb(req.user._id);
+      if (!allowedRoles.includes(user.role)) {
+        throw new AuthorizationError(`Access denied. Required roles: ${allowedRoles.join(', ')}`);
+      }
+      req.user = user;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
 };
 
 module.exports = {
@@ -174,5 +140,6 @@ module.exports = {
   requireUser,
   requireManagerOrAdmin,
   requireAnyUser,
-  requireAdminManagerOrQA
+  requireAdminManagerOrQA,
+  requireRole
 }; 

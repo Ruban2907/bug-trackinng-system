@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
 import { getUserInfo } from '../../utils/userUtils';
 
-const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
+const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate }) => {
   const [showDetails, setShowDetails] = useState(false);
-  const [showReassignModal, setShowReassignModal] = useState(false);
-  const [newAssignee, setNewAssignee] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
 
   const userInfo = getUserInfo();
   const canEdit = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.role === 'qa');
   const canDelete = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.role === 'qa');
   const canUpdateStatus = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.role === 'qa' || userInfo.role === 'developer');
-  const canReassign = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager');
-  const canReassignForUser = canReassign && userInfo.role !== 'developer';
+
+
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -31,23 +28,6 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
   const handleStatusUpdate = async (newStatus) => {
     if (onStatusUpdate) {
       await onStatusUpdate(bug._id, newStatus);
-    }
-  };
-
-  const handleReassign = async () => {
-    if (!newAssignee) return;
-
-    setIsUpdating(true);
-    try {
-      if (onReassign) {
-        await onReassign(bug._id, newAssignee);
-        setShowReassignModal(false);
-        setNewAssignee('');
-      }
-    } catch (error) {
-      console.error('Error reassigning bug:', error);
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -86,6 +66,9 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
               <h3 className="text-lg font-semibold text-gray-900 mb-1">{bug.title}</h3>
               <p className="text-sm text-gray-600">
                 Project: {bug.projectId?.name || 'Unknown Project'}
+                {!bug.projectId?.name && bug.projectId && (
+                  <span className="text-xs text-gray-400 ml-1">(ID: {bug.projectId})</span>
+                )}
               </p>
             </div>
             <button
@@ -188,36 +171,26 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
                 </div>
               )}
 
-              {/* Status Update */}
-              {canUpdateStatus && (
-                <select
-                  value={bug.status}
-                  onChange={(e) => handleStatusUpdate(e.target.value)}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="new">New</option>
-                  <option value="started">Started</option>
-                  {bug.type === 'bug' ? (
-                    <>
-                      <option value="resolved">Resolved</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="completed">Completed</option>
-                    </>
-                  )}
-                </select>
-              )}
-
-              {/* Reassign Button */}
-              {canReassignForUser && (
-                <button
-                  onClick={() => setShowReassignModal(true)}
-                  className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
-                >
-                  Reassign
-                </button>
-              )}
+                             {/* Status Update */}
+               {canUpdateStatus && (
+                 <select
+                   value={bug.status}
+                   onChange={(e) => handleStatusUpdate(e.target.value)}
+                   className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 >
+                   <option value="new">New</option>
+                   <option value="started">Started</option>
+                   {bug.type === 'bug' ? (
+                     <>
+                       <option value="resolved">Resolved</option>
+                     </>
+                   ) : (
+                     <>
+                       <option value="completed">Completed</option>
+                     </>
+                   )}
+                 </select>
+               )}
 
               {/* Edit Button */}
               {canEdit && onEdit && (
@@ -243,51 +216,7 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate, onReassign }) => {
         )}
       </div>
 
-      {/* Reassign Modal */}
-      {showReassignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Reassign Bug</h3>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Assign to Developer
-                </label>
-                <select
-                  value={newAssignee}
-                  onChange={(e) => setNewAssignee(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Select developer</option>
-                  {bug.projectId?.developersAssigned?.map(dev => (
-                    <option key={dev._id} value={dev._id}>
-                      {dev.firstname} {dev.lastname} ({dev.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowReassignModal(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleReassign}
-                  disabled={!newAssignee || isUpdating}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUpdating ? 'Reassigning...' : 'Reassign'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </>
   );
 };

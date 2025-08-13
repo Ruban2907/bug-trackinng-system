@@ -19,9 +19,7 @@ const MyProjects = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [bugToDelete, setBugToDelete] = useState(null);
   const [deletingBug, setDeletingBug] = useState(null);
-  const [showReassignModal, setShowReassignModal] = useState(false);
-  const [bugToReassign, setBugToReassign] = useState(null);
-  const [reassigningBug, setReassigningBug] = useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,7 +49,8 @@ const MyProjects = () => {
       }
 
       const projectsData = await projectsRes.json();
-      const projectsList = projectsData.projects || [];
+      // Extract data from new response format
+      const projectsList = projectsData.data || projectsData.projects || [];
       setProjects(projectsList);
 
       await fetchProjectBugs(projectsList);
@@ -69,7 +68,9 @@ const MyProjects = () => {
           const bugsRes = await apiService.authenticatedRequest(`/bugs?projectId=${project._id}`);
           if (bugsRes.ok) {
             const bugsData = await bugsRes.json();
-            return { projectId: project._id, bugs: bugsData.bugs || [] };
+            // Extract data from new response format
+            const bugsList = bugsData.data || bugsData.bugs || [];
+            return { projectId: project._id, bugs: bugsList };
           }
         } catch (error) {
           console.error(`Error fetching bugs for project ${project._id}:`, error);
@@ -151,75 +152,7 @@ const MyProjects = () => {
     setBugToDelete(null);
   };
 
-  const handleBugReassign = (bug) => {
-    setBugToReassign(bug);
-    setShowReassignModal(true);
-  };
 
-  const handleBugReassignConfirm = async (newAssignee) => {
-    if (!bugToReassign) return;
-
-    setReassigningBug(bugToReassign._id);
-    try {
-      const res = await apiService.reassignBug(bugToReassign._id, newAssignee);
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.message || 'Failed to reassign bug');
-      } else {
-        toast.success('Bug reassigned successfully');
-        setProjectBugs(prev => {
-          const newState = { ...prev };
-          Object.keys(newState).forEach(projectId => {
-            newState[projectId] = newState[projectId].map(bug =>
-              bug._id === bugToReassign._id ? { ...bug, assignedTo: newAssignee } : bug
-            );
-          });
-          return newState;
-        });
-        setShowReassignModal(false);
-        setBugToReassign(null);
-      }
-    } catch (error) {
-      console.error('Error reassigning bug:', error);
-      toast.error('Failed to reassign bug');
-    } finally {
-      setReassigningBug(null);
-    }
-  };
-
-  const handleBugReassignCancel = () => {
-    setShowReassignModal(false);
-    setBugToReassign(null);
-  };
-
-  const handleInlineReassign = async (bugId, newAssignee) => {
-    if (!bugId || !newAssignee) return;
-    setReassigningBug(bugId);
-    try {
-      const res = await apiService.reassignBug(bugId, newAssignee);
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.message || 'Failed to reassign bug');
-      } else {
-        toast.success('Bug reassigned successfully');
-        setProjectBugs(prev => {
-          const newState = { ...prev };
-          Object.keys(newState).forEach(projectId => {
-            newState[projectId] = newState[projectId].map(bug =>
-              bug._id === bugId ? { ...bug, assignedTo: data?.bug?.assignedTo || newAssignee } : bug
-            );
-          });
-          return newState;
-        });
-      }
-    } catch (error) {
-      console.error('Error reassigning bug:', error);
-      toast.error('Failed to reassign bug');
-    } finally {
-      setReassigningBug(null);
-    }
-  };
 
   const handleStatusUpdate = async (bugId, newStatus) => {
     try {
@@ -307,36 +240,33 @@ const MyProjects = () => {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Bugs</h3>
 
                   <div className="space-y-4">
-                    {projectBugs[project._id].map(bug => (
-                      userInfo.role === 'qa' ? (
-                        <BugCard
-                          key={bug._id}
-                          bug={bug}
-                          onEdit={handleBugEdit}
-                          onDelete={handleBugDelete}
-                          onStatusUpdate={handleStatusUpdate}
-                          onReassign={handleInlineReassign}
-                        />
-                      ) : userInfo.role === 'developer' ? (
-                        <BugCard
-                          key={bug._id}
-                          bug={bug}
-                          onEdit={null}
-                          onDelete={null}
-                          onStatusUpdate={handleStatusUpdate}
-                          onReassign={null}
-                        />
-                      ) : (
-                        <BugCard
-                          key={bug._id}
-                          bug={bug}
-                          onEdit={handleBugEdit}
-                          onDelete={handleBugDelete}
-                          onStatusUpdate={handleStatusUpdate}
-                          onReassign={handleBugReassign}
-                        />
-                      )
-                    ))}
+                                          {projectBugs[project._id].map(bug => (
+                        userInfo.role === 'qa' ? (
+                          <BugCard
+                            key={bug._id}
+                            bug={bug}
+                            onEdit={handleBugEdit}
+                            onDelete={handleBugDelete}
+                            onStatusUpdate={handleStatusUpdate}
+                          />
+                        ) : userInfo.role === 'developer' ? (
+                          <BugCard
+                            key={bug._id}
+                            bug={bug}
+                            onEdit={null}
+                            onDelete={null}
+                            onStatusUpdate={handleStatusUpdate}
+                          />
+                        ) : (
+                          <BugCard
+                            key={bug._id}
+                            bug={bug}
+                            onEdit={handleBugEdit}
+                            onDelete={handleBugDelete}
+                            onStatusUpdate={handleStatusUpdate}
+                          />
+                        )
+                      ))}
                   </div>
                 </div>
               )}
@@ -372,17 +302,7 @@ const MyProjects = () => {
         isLoading={deletingBug !== null}
       />
 
-      {/* Reassign Modal */}
-      <ConfirmationModal
-        isOpen={showReassignModal}
-        onClose={handleBugReassignCancel}
-        onConfirm={() => handleBugReassignConfirm(bugToReassign?.assignedTo?._id || '')}
-        title="Reassign Bug"
-        message={bugToReassign ? `Are you sure you want to reassign "${bugToReassign.title}"?` : ''}
-        confirmText="Reassign"
-        cancelText="Cancel"
-        isLoading={reassigningBug !== null}
-      />
+
     </Layout>
   );
 };

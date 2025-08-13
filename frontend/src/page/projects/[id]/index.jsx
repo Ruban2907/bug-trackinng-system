@@ -21,9 +21,7 @@ const ProjectDetails = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [bugToDelete, setBugToDelete] = useState(null);
   const [deletingBug, setDeletingBug] = useState(null);
-  const [showReassignModal, setShowReassignModal] = useState(false);
-  const [bugToReassign, setBugToReassign] = useState(null);
-  const [reassigningBug, setReassigningBug] = useState(null);
+
 
   useEffect(() => {
     const user = getUserInfo();
@@ -45,7 +43,7 @@ const ProjectDetails = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setProject(data.project);
+        setProject(data.data);
       } else {
         console.error('ProjectDetails: Failed to load project:', data.message);
         toast.error(data.message || 'Failed to load project details');
@@ -55,6 +53,8 @@ const ProjectDetails = () => {
       console.error('ProjectDetails: Error fetching project details:', error);
       toast.error('Failed to load project details');
       navigate('/projects');
+    } finally {
+      setIsLoading(false);
     }
   }, [id]);
 
@@ -64,7 +64,7 @@ const ProjectDetails = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setBugs(data.bugs || []);
+        setBugs(data.data || data.bugs || []);
       } else {
         console.error('ProjectDetails: Failed to load bugs:', data.message);
         toast.error(data.message || 'Failed to load project bugs');
@@ -72,8 +72,6 @@ const ProjectDetails = () => {
     } catch (error) {
       console.error('ProjectDetails: Error fetching project bugs:', error);
       toast.error('Failed to load project bugs');
-    } finally {
-      setIsLoading(false);
     }
   }, [id]);
 
@@ -126,41 +124,7 @@ const ProjectDetails = () => {
     setBugToDelete(null);
   };
 
-  const handleBugReassign = (bug) => {
-    setBugToReassign(bug);
-    setShowReassignModal(true);
-  };
 
-  const handleBugReassignConfirm = async (newAssignee) => {
-    if (!bugToReassign) return;
-
-    setReassigningBug(bugToReassign._id);
-    try {
-      const res = await apiService.reassignBug(bugToReassign._id, newAssignee);
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.message || 'Failed to reassign bug');
-      } else {
-        toast.success('Bug reassigned successfully');
-        setBugs(prev => prev.map(bug =>
-          bug._id === bugToReassign._id ? { ...bug, assignedTo: newAssignee } : bug
-        ));
-        setShowReassignModal(false);
-        setBugToReassign(null);
-      }
-    } catch (error) {
-      console.error('Error reassigning bug:', error);
-      toast.error('Failed to reassign bug');
-    } finally {
-      setReassigningBug(null);
-    }
-  };
-
-  const handleBugReassignCancel = () => {
-    setShowReassignModal(false);
-    setBugToReassign(null);
-  };
 
   const handleStatusUpdate = async (bugId, newStatus) => {
     try {
@@ -238,7 +202,7 @@ const ProjectDetails = () => {
 
       {/* Project Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+        <div className="bg-white rounded-xl shadow-md p-6 ">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
               <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -252,7 +216,7 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500">
+        <div className="bg-white rounded-xl shadow-md p-6 ">
           <div className="flex items-center">
             <div className="p-2 bg-red-100 rounded-lg">
               <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -266,7 +230,7 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+        <div className="bg-white rounded-xl shadow-md p-6 ">
           <div className="flex items-center">
             <div className="p-2 bg-purple-100 rounded-lg">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +244,7 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-gray-500">
+        <div className="bg-white rounded-xl shadow-md p-6 ">
           <div className="flex items-center">
             <div className="p-2 bg-gray-100 rounded-lg">
               <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -294,7 +258,7 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+        <div className="bg-white rounded-xl shadow-md p-6 ">
           <div className="flex items-center">
             <div className="p-2 bg-yellow-100 rounded-lg">
               <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,7 +272,7 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
+        <div className="bg-white rounded-xl shadow-md p-6 ">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -496,7 +460,6 @@ const ProjectDetails = () => {
                 onEdit={handleBugEdit}
                 onDelete={handleBugDelete}
                 onStatusUpdate={handleStatusUpdate}
-                onReassign={handleBugReassign}
               />
             ))}
           </div>
@@ -531,17 +494,7 @@ const ProjectDetails = () => {
         isLoading={deletingBug !== null}
       />
 
-      {/* Reassign Modal */}
-      <ConfirmationModal
-        isOpen={showReassignModal}
-        onClose={handleBugReassignCancel}
-        onConfirm={() => handleBugReassignConfirm(bugToReassign?.assignedTo?._id || '')}
-        title="Reassign Bug"
-        message={bugToReassign ? `Are you sure you want to reassign "${bugToReassign.title}"?` : ''}
-        confirmText="Reassign"
-        cancelText="Cancel"
-        isLoading={reassigningBug !== null}
-      />
+
     </Layout>
   );
 };

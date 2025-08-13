@@ -9,12 +9,17 @@ const ProtectedRoute = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = () => {
-      if (!isAuthenticated()) {
-        toast.error("Please login to access this page");
-        navigate("/login");
-        return;
-      }
-      setIsLoading(false);
+      // Add a small delay to ensure authentication state is properly set
+      const timer = setTimeout(() => {
+        if (!isAuthenticated()) {
+          toast.error("Please login to access this page");
+          navigate("/login", { replace: true });
+          return;
+        }
+        setIsLoading(false);
+      }, 100); // Small delay to ensure state is set
+
+      return () => clearTimeout(timer);
     };
 
     checkAuth();

@@ -25,16 +25,26 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
         assignedTo: bug.assignedTo?._id || '',
         status: bug.status || 'new'
       });
-      fetchProjectDevelopers();
+      // Only fetch developers if we have a projectId
+      if (bug.projectId) {
+        fetchProjectDevelopers();
+      }
     }
   }, [bug]);
 
   const fetchProjectDevelopers = async () => {
     try {
-      const response = await apiService.authenticatedRequest(`/projects/${bug.projectId._id}`);
+      // Handle both populated and unpopulated projectId
+      const projectId = bug.projectId?._id || bug.projectId;
+      if (!projectId) {
+        console.error('No project ID found in bug:', bug);
+        return;
+      }
+      
+      const response = await apiService.authenticatedRequest(`/projects/${projectId}`);
       if (response.ok) {
         const data = await response.json();
-        setDevelopers(data.project.developersAssigned || []);
+        setDevelopers(data.data?.developersAssigned || []);
       }
     } catch (error) {
       console.error('Error fetching project developers:', error);
@@ -94,7 +104,7 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
 
       if (response.ok) {
         toast.success('Bug updated successfully!');
-        onBugUpdated(data.bug);
+        onBugUpdated(data.data);
         onClose();
       } else {
         toast.error(data.message || 'Failed to update bug');
@@ -215,7 +225,7 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
               />
             </div>
 
-            {developers.length > 0 && (
+            {developers.length > 0 ? (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Assign to Developer
@@ -233,6 +243,14 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
                     </option>
                   ))}
                 </select>
+              </div>
+            ) : bug.projectId ? (
+              <div className="text-sm text-gray-500">
+                No developers assigned to this project
+              </div>
+            ) : (
+              <div className="text-sm text-red-500">
+                Project information not available
               </div>
             )}
 

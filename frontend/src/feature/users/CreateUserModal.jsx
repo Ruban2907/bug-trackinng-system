@@ -94,7 +94,7 @@ const CreateUserModal = ({ role, onClose, onUserCreated }) => {
 
       if (response.ok) {
         const data = await response.json();
-        onUserCreated(data.user);
+        onUserCreated(data.data);
       } else {
         const errorData = await response.json();
         toast.error(errorData.message || 'Failed to create user');

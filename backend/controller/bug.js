@@ -1,6 +1,9 @@
 const Bug = require("../model/bug");
 const Project = require("../model/project");
 const User = require("../model/user");
+const { successResponse, createdResponse, errorResponse, notFoundResponse, forbiddenResponse, validationErrorResponse } = require("../utils/responseHandler");
+const { ValidationError, AuthorizationError, NotFoundError } = require("../utils/errors");
+const { asyncHandler } = require("../middleware/errorHandler");
 
 const serializeBug = (bug) => {
   const bugObj = bug.toObject();
@@ -27,485 +30,294 @@ const populateBug = async (bug) => {
   return await bug.populate([
     { path: 'createdBy', select: 'firstname lastname email role' },
     { path: 'assignedTo', select: 'firstname lastname email role' },
-    { path: 'projectId', select: 'name' }
+    { path: 'projectId', select: 'name developersAssigned' }
   ]);
 };
 
 async function handleCreateBug(req, res) {
-  try {
-    const { title, type, status, description, deadline, projectId, assignedTo } = req.body;
+  const { title, type, status, description, deadline, projectId, assignedTo } = req.body;
 
-    const currentUser = req.currentUser;
-    if (!currentUser) {
-      return res.status(401).json({
-        message: "User not authenticated"
-      });
-    }
-
-    if (currentUser.role === 'developer') {
-      return res.status(403).json({
-        message: "Access denied: Developers cannot create bugs"
-      });
-    }
-
-    if (!title || !type || !projectId) {
-      return res.status(400).json({
-        message: "Title, type, and projectId are required"
-      });
-    }
-
-    const project = await Project.findById(projectId)
-      .populate('qaAssigned', '_id')
-      .populate('developersAssigned', '_id');
-
-    if (!project) {
-      return res.status(404).json({
-        message: "Project not found"
-      });
-    }
-
-    if (!checkProjectAccess(currentUser, project)) {
-      return res.status(403).json({
-        message: "Access denied: You can only create bugs in projects assigned to you"
-      });
-    }
-
-    if (!project.developersAssigned || project.developersAssigned.length === 0) {
-      return res.status(400).json({
-        message: "Cannot create bug: No developers are assigned to this project"
-      });
-    }
-
-    let assignedDeveloperId;
-
-    if (assignedTo) {
-      if (!isDeveloperInProject(project, assignedTo)) {
-        return res.status(400).json({
-          message: "Assigned developer is not part of this project"
-        });
-      }
-
-      const assignedDeveloper = await User.findById(assignedTo);
-      if (!assignedDeveloper || assignedDeveloper.role !== 'developer') {
-        return res.status(400).json({
-          message: "Assigned user must be a developer"
-        });
-      }
-
-      assignedDeveloperId = assignedTo;
-    } else {
-      assignedDeveloperId = project.developersAssigned[0]._id;
-    }
-
-    const bugData = {
-      title,
-      type,
-      status: status || 'new',
-      description: description || '',
-      deadline: deadline || null,
-      projectId: project._id,
-      createdBy: currentUser._id,
-      assignedTo: assignedDeveloperId
-    };
-
-    if (req.file) {
-      bugData.screenshot = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype
-      };
-    }
-
-    const newBug = await Bug.create(bugData);
-
-    await populateBug(newBug);
-
-    return res.status(201).json({
-      message: 'Bug/Feature created successfully',
-      bug: serializeBug(newBug)
-    });
-  } catch (error) {
-    console.error("Create bug error:", error);
-    res.status(500).json({ message: "Internal server error while creating bug" });
+  const currentUser = req.user;
+  if (!currentUser) {
+    throw new AuthorizationError("User not authenticated");
   }
-}
 
-async function handleGetAllBugs(req, res) {
-  try {
-    const { projectId } = req.query;
-
-    const currentUser = req.currentUser;
-    if (!currentUser) {
-      return res.status(401).json({
-        message: "User not authenticated"
-      });
-    }
-
-    let query = {};
-
-    if (projectId) {
-      const project = await Project.findById(projectId)
-        .populate('qaAssigned', '_id')
-        .populate('developersAssigned', '_id');
-
-      if (!project) {
-        return res.status(404).json({
-          message: "Project not found"
-        });
-      }
-
-      if (!checkProjectAccess(currentUser, project)) {
-        return res.status(403).json({
-          message: "Access denied: You can only view bugs in projects assigned to you"
-        });
-      }
-
-      query.projectId = projectId;
-    } else {
-      const projects = await Project.find({
-        $or: [
-          { qaAssigned: currentUser._id },
-          { developersAssigned: currentUser._id }
-        ]
-      });
-
-      if (currentUser.role !== 'admin' && currentUser.role !== 'manager') {
-        if (projects.length === 0) {
-          return res.status(403).json({
-            message: "Access denied: You don't have access to any projects"
-          });
-        }
-        query.projectId = { $in: projects.map(p => p._id) };
-      }
-    }
-
-    const bugs = await Bug.find(query)
-      .populate('createdBy', 'firstname lastname email role')
-      .populate('assignedTo', 'firstname lastname email role')
-      .populate('projectId', 'name')
-      .select('+screenshot')
-      .sort({ createdAt: -1 });
-
-    const serializedBugs = bugs.map(bug => serializeBug(bug));
-
-    return res.status(200).json({
-      message: 'Bugs retrieved successfully',
-      bugs: serializedBugs
-    });
-  } catch (error) {
-    console.error("Get all bugs error:", error);
-    res.status(500).json({ message: "Internal server error while retrieving bugs" });
+  if (currentUser.role === 'developer') {
+    throw new AuthorizationError("Access denied: Developers cannot create bugs");
   }
-}
 
-async function handleGetBugById(req, res) {
-  try {
-    const { bugId } = req.params;
-
-    const currentUser = req.currentUser;
-    if (!currentUser) {
-      return res.status(401).json({
-        message: "User not authenticated"
-      });
-    }
-
-    if (!bugId) {
-      return res.status(400).json({
-        message: "Bug ID is required"
-      });
-    }
-
-    const bug = await Bug.findById(bugId)
-      .populate('createdBy', 'firstname lastname email role')
-      .populate('assignedTo', 'firstname lastname email role')
-      .populate('projectId', 'name qaAssigned developersAssigned');
-
-    if (!bug) {
-      return res.status(404).json({
-        message: "Bug not found"
-      });
-    }
-
-    const project = bug.projectId;
-    if (!checkProjectAccess(currentUser, project)) {
-      return res.status(403).json({
-        message: "Access denied: You can only view bugs in projects assigned to you"
-      });
-    }
-
-    return res.status(200).json({
-      message: 'Bug retrieved successfully',
-      bug: serializeBug(bug)
-    });
-  } catch (error) {
-    console.error("Get bug by ID error:", error);
-    res.status(500).json({ message: "Internal server error while retrieving bug" });
+  if (!title || !type || !projectId) {
+    throw new ValidationError("Title, type, and projectId are required");
   }
-}
 
-async function handleUpdateBug(req, res) {
-  try {
-    const { bugId } = req.params;
-    const { title, type, status, description, deadline, assignedTo } = req.body;
+  const project = await Project.findById(projectId)
+    .populate('qaAssigned', '_id')
+    .populate('developersAssigned', '_id');
 
-    const currentUser = req.currentUser;
-    if (!currentUser) {
-      return res.status(401).json({
-        message: "User not authenticated"
-      });
-    }
-
-    if (!bugId) {
-      return res.status(400).json({
-        message: "Bug ID is required"
-      });
-    }
-
-    const bug = await Bug.findById(bugId)
-      .populate('projectId', 'qaAssigned developersAssigned');
-
-    if (!bug) {
-      return res.status(404).json({
-        message: "Bug not found"
-      });
-    }
-
-    const project = bug.projectId;
-    if (!checkProjectAccess(currentUser, project)) {
-      return res.status(403).json({
-        message: "Access denied: You can only update bugs in projects assigned to you"
-      });
-    }
-
-    if (currentUser.role === 'developer') {
-      if (status) {
-        bug.status = status;
-      } else {
-        return res.status(400).json({
-          message: "Developers can only update bug status"
-        });
-      }
-    } else {
-      if (title) bug.title = title;
-      if (type) bug.type = type;
-      if (status) bug.status = status;
-      if (description !== undefined) bug.description = description;
-      if (deadline !== undefined) bug.deadline = deadline;
-
-      if (assignedTo) {
-        if (!isDeveloperInProject(project, assignedTo)) {
-          return res.status(400).json({
-            message: "Assigned developer must be part of this project"
-          });
-        }
-
-        bug.assignedTo = assignedTo;
-      }
-
-      if (req.file) {
-        bug.screenshot = {
-          data: req.file.buffer,
-          contentType: req.file.mimetype
-        };
-      }
-    }
-
-    await bug.save();
-
-    await populateBug(bug);
-
-    return res.status(200).json({
-      message: 'Bug updated successfully',
-      bug: serializeBug(bug)
-    });
-  } catch (error) {
-    console.error("Update bug error:", error);
-    res.status(500).json({ message: "Internal server error while updating bug" });
+  if (!project) {
+    throw new NotFoundError("Project not found");
   }
-}
 
-async function handleDeleteBug(req, res) {
-  try {
-    const { bugId } = req.params;
-
-    const currentUser = req.currentUser;
-    if (!currentUser) {
-      return res.status(401).json({
-        message: "User not authenticated"
-      });
-    }
-
-    if (!bugId) {
-      return res.status(400).json({
-        message: "Bug ID is required"
-      });
-    }
-
-    const bug = await Bug.findById(bugId)
-      .populate('projectId', 'qaAssigned developersAssigned');
-
-    if (!bug) {
-      return res.status(404).json({
-        message: "Bug not found"
-      });
-    }
-
-    const project = bug.projectId;
-    const hasAccess = 
-      currentUser.role === 'admin' ||
-      currentUser.role === 'manager' ||
-      project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString());
-
-    if (!hasAccess) {
-      return res.status(403).json({
-        message: "Access denied: Only QA, managers, and admins can delete bugs"
-      });
-    }
-
-    await Bug.findByIdAndDelete(bugId);
-
-    return res.status(200).json({
-      message: 'Bug deleted successfully'
-    });
-  } catch (error) {
-    console.error("Delete bug error:", error);
-    res.status(500).json({ message: "Internal server error while deleting bug" });
+  if (!checkProjectAccess(currentUser, project)) {
+    throw new AuthorizationError("Access denied: You can only create bugs in projects assigned to you");
   }
-}
 
-async function handleUpdateBugStatus(req, res) {
-  try {
-    const { bugId } = req.params;
-    const { status } = req.body;
-
-    const currentUser = req.currentUser;
-    if (!currentUser) {
-      return res.status(401).json({
-        message: "User not authenticated"
-      });
-    }
-
-    if (!bugId) {
-      return res.status(400).json({
-        message: "Bug ID is required"
-      });
-    }
-
-    if (!status) {
-      return res.status(400).json({
-        message: "Status is required"
-      });
-    }
-
-    const bug = await Bug.findById(bugId)
-      .populate('projectId', 'qaAssigned developersAssigned');
-
-    if (!bug) {
-      return res.status(404).json({
-        message: "Bug not found"
-      });
-    }
-
-    const project = bug.projectId;
-    if (!checkProjectAccess(currentUser, project)) {
-      return res.status(403).json({
-        message: "Access denied: You can only update bugs in projects assigned to you"
-      });
-    }
-
-    bug.status = status;
-    await bug.save();
-
-    await populateBug(bug);
-
-    return res.status(200).json({
-      message: 'Bug status updated successfully',
-      bug: serializeBug(bug)
-    });
-  } catch (error) {
-    console.error("Update bug status error:", error);
-    res.status(500).json({ message: "Internal server error while updating bug status" });
+  if (!project.developersAssigned || project.developersAssigned.length === 0) {
+    throw new ValidationError("Cannot create bug: No developers are assigned to this project");
   }
-}
 
-async function handleReassignBug(req, res) {
-  try {
-    const { bugId } = req.params;
-    const { assignedTo } = req.body;
+  let assignedDeveloperId;
 
-    const currentUser = req.currentUser;
-    if (!currentUser) {
-      return res.status(401).json({
-        message: "User not authenticated"
-      });
-    }
-
-    if (!bugId) {
-      return res.status(400).json({
-        message: "Bug ID is required"
-      });
-    }
-
-    if (!assignedTo) {
-      return res.status(400).json({
-        message: "Assigned developer ID is required"
-      });
-    }
-
-    const bug = await Bug.findById(bugId)
-      .populate('projectId', 'qaAssigned developersAssigned');
-
-    if (!bug) {
-      return res.status(404).json({
-        message: "Bug not found"
-      });
-    }
-
-    const project = bug.projectId;
-    const hasAccess = 
-      currentUser.role === 'admin' ||
-      currentUser.role === 'manager' ||
-      project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString());
-
-    if (!hasAccess) {
-      return res.status(403).json({
-        message: "Access denied: Only QA, managers, and admins can reassign bugs"
-      });
-    }
-
+  if (assignedTo) {
     if (!isDeveloperInProject(project, assignedTo)) {
-      return res.status(400).json({
-        message: "Assigned developer is not part of this project"
-      });
+      throw new ValidationError("Assigned developer is not part of this project");
     }
 
     const assignedDeveloper = await User.findById(assignedTo);
     if (!assignedDeveloper || assignedDeveloper.role !== 'developer') {
-      return res.status(400).json({
-        message: "Assigned user must be a developer"
-      });
+      throw new ValidationError("Assigned user must be a developer");
     }
 
-    bug.assignedTo = assignedTo;
-    await bug.save();
-
-    await populateBug(bug);
-
-    return res.status(200).json({
-      message: 'Bug reassigned successfully',
-      bug: serializeBug(bug)
-    });
-  } catch (error) {
-    console.error("Reassign bug error:", error);
-    res.status(500).json({ message: "Internal server error while reassigning bug" });
+    assignedDeveloperId = assignedTo;
+  } else {
+    assignedDeveloperId = project.developersAssigned[0]._id;
   }
+
+  const bugData = {
+    title,
+    type,
+    status: status || 'new',
+    description: description || '',
+    deadline: deadline || null,
+    projectId,
+    createdBy: currentUser._id,
+    assignedTo: assignedDeveloperId,
+  };
+
+  if (req.file) {
+    bugData.screenshot = {
+      data: req.file.buffer,
+      contentType: req.file.mimetype,
+    };
+  }
+
+  const newBug = await Bug.create(bugData);
+  await populateBug(newBug);
+
+  return createdResponse(res, 'Bug created successfully', serializeBug(newBug));
 }
 
+async function handleGetAllBugs(req, res) {
+  const { projectId } = req.query;
+  const currentUser = req.user;
+
+  if (!currentUser) {
+    throw new AuthorizationError("User not authenticated");
+  }
+
+  let query = {};
+  if (projectId) {
+    query.projectId = projectId;
+  }
+
+  if (currentUser.role === 'developer') {
+    query.assignedTo = currentUser._id;
+  } else if (currentUser.role === 'qa') {
+    const userProjects = await Project.find({
+      qaAssigned: currentUser._id
+    }).select('_id');
+    query.projectId = { $in: userProjects.map(p => p._id) };
+  }
+
+  const bugs = await Bug.find(query)
+    .populate('createdBy', 'firstname lastname email role')
+    .populate('assignedTo', 'firstname lastname email role')
+    .populate('projectId', 'name developersAssigned')
+    .sort({ createdAt: -1 });
+
+  const serialized = bugs.map(serializeBug);
+
+  return successResponse(res, 200, 'Bugs retrieved successfully', serialized);
+}
+
+async function handleGetBugById(req, res) {
+  const { bugId } = req.params;
+  const currentUser = req.user;
+
+  if (!currentUser) {
+    throw new AuthorizationError("User not authenticated");
+  }
+
+  if (!bugId) {
+    throw new ValidationError("Bug ID is required");
+  }
+
+  const bug = await Bug.findById(bugId)
+    .populate('createdBy', 'firstname lastname email role')
+    .populate('assignedTo', 'firstname lastname email role')
+    .populate('projectId', 'name developersAssigned');
+
+  if (!bug) {
+    throw new NotFoundError("Bug not found");
+  }
+
+  if (currentUser.role === 'developer' && bug.assignedTo._id.toString() !== currentUser._id.toString()) {
+    throw new AuthorizationError("Access denied: You can only view bugs assigned to you");
+  }
+
+  if (currentUser.role === 'qa') {
+    const project = await Project.findById(bug.projectId._id);
+    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+      throw new AuthorizationError("Access denied: You can only view bugs in projects assigned to you");
+    }
+  }
+
+  return successResponse(res, 200, 'Bug retrieved successfully', serializeBug(bug));
+}
+
+async function handleUpdateBug(req, res) {
+  const { bugId } = req.params;
+  const { title, type, status, description, deadline, assignedTo } = req.body;
+  const currentUser = req.user;
+
+  if (!currentUser) {
+    throw new AuthorizationError("User not authenticated");
+  }
+
+  if (!bugId) {
+    throw new ValidationError("Bug ID is required");
+  }
+
+  const bug = await Bug.findById(bugId);
+  if (!bug) {
+    throw new NotFoundError("Bug not found");
+  }
+
+  if (currentUser.role === 'developer') {
+    if (bug.assignedTo.toString() !== currentUser._id.toString()) {
+      throw new AuthorizationError("Access denied: You can only update bugs assigned to you");
+    }
+    if (title || type || assignedTo) {
+      throw new AuthorizationError("Access denied: Developers can only update status and description");
+    }
+  }
+
+  if (currentUser.role === 'qa') {
+    const project = await Project.findById(bug.projectId);
+    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+      throw new AuthorizationError("Access denied: You can only update bugs in projects assigned to you");
+    }
+  }
+
+  if (title) bug.title = title;
+  if (type) bug.type = type;
+  if (status) bug.status = status;
+  if (description !== undefined) bug.description = description;
+  if (deadline !== undefined) bug.deadline = deadline;
+
+  if (assignedTo && currentUser.role !== 'developer') {
+    const project = await Project.findById(bug.projectId);
+    if (!project.developersAssigned.some(dev => dev.toString() === assignedTo)) {
+      throw new ValidationError("Assigned developer must be part of the project");
+    }
+    bug.assignedTo = assignedTo;
+  }
+
+  if (req.file) {
+    bug.screenshot = {
+      data: req.file.buffer,
+      contentType: req.file.mimetype,
+    };
+  }
+
+  await bug.save();
+  await populateBug(bug);
+
+  return successResponse(res, 200, 'Bug updated successfully', serializeBug(bug));
+}
+
+async function handleDeleteBug(req, res) {
+  const { bugId } = req.params;
+  const currentUser = req.user;
+
+  if (!currentUser) {
+    throw new AuthorizationError("User not authenticated");
+  }
+
+  if (!bugId) {
+    throw new ValidationError("Bug ID is required");
+  }
+
+  const bug = await Bug.findById(bugId);
+  if (!bug) {
+    throw new NotFoundError("Bug not found");
+  }
+
+  if (currentUser.role === 'developer') {
+    throw new AuthorizationError("Access denied: Developers cannot delete bugs");
+  }
+
+  if (currentUser.role === 'qa') {
+    const project = await Project.findById(bug.projectId);
+    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+      throw new AuthorizationError("Access denied: You can only delete bugs in projects assigned to you");
+    }
+  }
+
+  await Bug.findByIdAndDelete(bugId);
+
+  return successResponse(res, 200, 'Bug deleted successfully');
+}
+
+async function handleUpdateBugStatus(req, res) {
+  const { bugId } = req.params;
+  const { status } = req.body;
+  const currentUser = req.user;
+
+  if (!currentUser) {
+    throw new AuthorizationError("User not authenticated");
+  }
+
+  if (!bugId) {
+    throw new ValidationError("Bug ID is required");
+  }
+
+  if (!status) {
+    throw new ValidationError("Status is required");
+  }
+
+  const bug = await Bug.findById(bugId);
+  if (!bug) {
+    throw new NotFoundError("Bug not found");
+  }
+
+  if (currentUser.role === 'developer') {
+    if (bug.assignedTo.toString() !== currentUser._id.toString()) {
+      throw new AuthorizationError("Access denied: You can only update bugs assigned to you");
+    }
+  }
+
+  if (currentUser.role === 'qa') {
+    const project = await Project.findById(bug.projectId);
+    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+      throw new AuthorizationError("Access denied: You can only update bugs in projects assigned to you");
+    }
+  }
+
+  bug.status = status;
+  await bug.save();
+  await populateBug(bug);
+
+  return successResponse(res, 200, 'Bug status updated successfully', serializeBug(bug));
+}
+
+
+
 module.exports = {
-  handleCreateBug,
-  handleGetAllBugs,
-  handleGetBugById,
-  handleUpdateBug,
-  handleDeleteBug,
-  handleUpdateBugStatus,
-  handleReassignBug
+  handleCreateBug: asyncHandler(handleCreateBug),
+  handleGetAllBugs: asyncHandler(handleGetAllBugs),
+  handleGetBugById: asyncHandler(handleGetBugById),
+  handleUpdateBug: asyncHandler(handleUpdateBug),
+  handleDeleteBug: asyncHandler(handleDeleteBug),
+  handleUpdateBugStatus: asyncHandler(handleUpdateBugStatus)
 };

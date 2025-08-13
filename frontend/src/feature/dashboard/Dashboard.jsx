@@ -44,24 +44,25 @@ const DashboardPage = () => {
         const projectsRes = await apiService.authenticatedRequest('/projects');
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json();
+          // Extract data from new response format
+          const projectsList = projectsData.data || projectsData.projects || [];
           setDashboardStats(prev => ({
             ...prev,
-            totalProjects: projectsData.projects?.length || 0
+            totalProjects: projectsList.length || 0
           }));
         }
-
-
       }
 
       if (userInfo && (userInfo.role === 'qa' || userInfo.role === 'developer')) {
         const projectsRes = await apiService.authenticatedRequest('/assigned-projects');
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json();
-          const projects = projectsData.projects || [];
+          // Extract data from new response format
+          const projectsList = projectsData.data || projectsData.projects || [];
 
           setDashboardStats(prev => ({
             ...prev,
-            totalProjects: projects.length
+            totalProjects: projectsList.length
           }));
         }
       }
@@ -72,21 +73,21 @@ const DashboardPage = () => {
         const bugsRes = await apiService.authenticatedRequest('/bugs');
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
-          bugs = bugsData.bugs || [];
+          // Extract data from new response format
+          bugs = bugsData.data || bugsData.bugs || [];
         }
       } else {
         const bugsRes = await apiService.authenticatedRequest('/bugs');
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
-          bugs = bugsData.bugs || [];
+          // Extract data from new response format
+          bugs = bugsData.data || bugsData.bugs || [];
         }
       }
 
       const activeBugs = bugs.filter(bug => bug.status === 'new' || bug.status === 'started').length;
       const resolvedIssues = bugs.filter(bug => bug.status === 'resolved' || bug.status === 'completed').length;
       const pendingFeatures = bugs.filter(bug => bug.type === 'feature' && bug.status !== 'completed').length;
-
-
 
       setDashboardStats(prev => ({
         ...prev,
@@ -304,7 +305,7 @@ const DashboardPage = () => {
                   <h4 className="font-medium text-gray-900 mb-2">🐛 Bug & Feature Management</h4>
                   <ul className="text-sm text-gray-700 space-y-1">
                     <li>• Create, edit, and delete bugs/features</li>
-                    <li>• Update bug statuses and reassign bugs</li>
+                    <li>• Update bug statuses</li>
                     <li>• View all project screenshots and details</li>
                     <li>• Monitor overall system performance</li>
                     <li>• Access comprehensive project analytics</li>
@@ -331,7 +332,7 @@ const DashboardPage = () => {
                   <h4 className="font-medium text-gray-900 mb-2">🐛 Bug & Feature Management</h4>
                   <ul className="text-sm text-gray-700 space-y-1">
                     <li>• Create, edit, and delete bugs/features</li>
-                    <li>• Update bug statuses and reassign bugs</li>
+                    <li>• Update bug statuses</li>
                     <li>• View all project screenshots and details</li>
                     <li>• Track bug resolution progress</li>
                     <li>• Manage feature development workflow</li>

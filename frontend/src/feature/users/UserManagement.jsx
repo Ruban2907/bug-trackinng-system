@@ -43,7 +43,9 @@ const UserManagement = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.users || []);
+        // Extract data from new response format
+        const usersList = data.data || data.users || [];
+        setUsers(usersList);
       } else {
         const errorData = await response.json();
         toast.error(errorData.message || 'Failed to fetch users');

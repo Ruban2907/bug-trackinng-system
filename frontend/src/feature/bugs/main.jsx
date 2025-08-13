@@ -25,9 +25,14 @@ const Bugs = () => {
     const user = getUserInfo();
     if (user) {
       setUserInfo(user);
-      fetchProjects();
     }
   }, []);
+
+  useEffect(() => {
+    if (userInfo) {
+      fetchProjects();
+    }
+  }, [userInfo]);
 
   useEffect(() => {
     if (userInfo) {
@@ -46,7 +51,9 @@ const Bugs = () => {
 
       if (projectsRes.ok) {
         const data = await projectsRes.json();
-        setProjects(data.projects || []);
+        // Extract data from new response format
+        const projectsList = data.data || data.projects || [];
+        setProjects(projectsList);
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -60,7 +67,9 @@ const Bugs = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setBugs(data.bugs || []);
+        // Extract data from new response format
+        const bugsList = data.data || data.bugs || [];
+        setBugs(bugsList);
       } else {
         toast.error(data.message || 'Failed to load bugs');
       }
@@ -101,7 +110,7 @@ const Bugs = () => {
 
       if (response.ok) {
         toast.success('Bug status updated successfully');
-        handleBugUpdated(data.bug);
+        handleBugUpdated(data.data);
       } else {
         toast.error(data.message || 'Failed to update bug status');
       }
@@ -111,22 +120,7 @@ const Bugs = () => {
     }
   };
 
-  const handleReassign = async (bugId, newAssignee) => {
-    try {
-      const response = await apiService.reassignBug(bugId, newAssignee);
-      const data = await response.json();
 
-      if (response.ok) {
-        toast.success('Bug reassigned successfully');
-        handleBugUpdated(data.bug);
-      } else {
-        toast.error(data.message || 'Failed to reassign bug');
-      }
-    } catch (error) {
-      console.error('Error reassigning bug:', error);
-      toast.error('Failed to reassign bug');
-    }
-  };
 
   const handleDeleteClick = (bug) => {
     setBugToDelete(bug);
@@ -254,7 +248,6 @@ const Bugs = () => {
               onEdit={handleEditClick}
               onDelete={handleDeleteClick}
               onStatusUpdate={handleStatusUpdate}
-              onReassign={handleReassign}
             />
           ))}
 
@@ -295,6 +288,7 @@ const Bugs = () => {
           bug={bugToEdit}
           onClose={handleEditClose}
           onBugUpdated={handleBugUpdated}
+          isOpen={showEditModal}
         />
       )}
 

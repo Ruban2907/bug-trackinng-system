@@ -116,11 +116,7 @@ export const apiService = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
-  reassignBug: (bugId, assignedTo) =>
-    apiService.authenticatedRequest(`/bugs/${bugId}/reassign`, {
-      method: "PATCH",
-      body: JSON.stringify({ assignedTo }),
-    }),
+
 };
 
 export default apiService;

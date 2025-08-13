@@ -44,11 +44,14 @@ const LoginPage = () => {
 
     try {
       const response = await apiService.login(form);
-      const data = await response.json();
+      const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+        throw new Error(responseData.message || 'Login failed');
       }
+
+      // Extract data from the new response structure
+      const data = responseData.data || responseData;
 
       if (data.token) {
         localStorage.setItem('token', data.token);
@@ -58,19 +61,7 @@ const LoginPage = () => {
         setUserInfo(data.foundUser);
       }
 
-      try {
-        const userResponse = await apiService.authenticatedRequest('/users/me', {
-          method: 'GET'
-        });
-        const userData = await userResponse.json();
-        if (userResponse.ok && userData.user) {
-          setUserInfo(userData.user);
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      }
-
-
+      // Navigate to dashboard immediately after setting auth data
       navigate("/dashboard");
       toast.success("Login Successful!");
 
@@ -96,10 +87,10 @@ const LoginPage = () => {
 
     try {
       const response = await apiService.forgotPassword({ email: forgotEmail });
-      const data = await response.json();
+      const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Email not found');
+        throw new Error(responseData.message || 'Email not found');
       }
 
       setEmailVerified(true);
@@ -150,10 +141,10 @@ const LoginPage = () => {
         newPassword: resetPassword
       });
 
-      const data = await response.json();
+      const responseData = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Password reset failed');
+        throw new Error(responseData.message || 'Password reset failed');
       }
 
       toast.success("Password reset successfully!");

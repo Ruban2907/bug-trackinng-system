@@ -24,6 +24,7 @@ export const clearUserInfo = () => {
 export const isAuthenticated = () => {
   const token = localStorage.getItem('token');
   const userInfo = getUserInfo();
+  
   return token && userInfo;
 };
 

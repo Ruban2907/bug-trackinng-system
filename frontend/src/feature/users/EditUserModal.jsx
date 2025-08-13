@@ -99,7 +99,7 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
 
       if (response.ok) {
         const data = await response.json();
-        onUserUpdated(data.user);
+        onUserUpdated(data.data);
         onClose();
       } else {
         const errorData = await response.json();

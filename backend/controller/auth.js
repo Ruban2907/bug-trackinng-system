@@ -1,139 +1,100 @@
 const User = require("../model/user");
 const { setUser } = require("../services/secret");
 const bcrypt = require('bcrypt');
+const { ValidationError, AuthenticationError, ConflictError } = require("../utils/errors");
+const { successResponse, createdResponse } = require("../utils/responseHandler");
+const { sanitizeUser } = require("../utils/helpers");
+const { asyncHandler } = require("../middleware/errorHandler");
 
 async function handleUserlogin(req, res) {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and Password are required" });
-    }
-    const foundUser = await User.findOne({ email: email });
-    if (!foundUser) {
-      return res.status(400).json('Invalid Username or Password')
-    }
-    const match = await bcrypt.compare(password, foundUser.password);
-    if (match) {
-      const token = setUser(foundUser);
+  const { email, password } = req.body;
 
-      const userData = {
-        _id: foundUser._id,
-        firstname: foundUser.firstname,
-        lastname: foundUser.lastname,
-        email: foundUser.email,
-        role: foundUser.role,
-        picture: foundUser.picture ? true : false
-      };
-      return res.status(200).json({ message: "User logged in", token, foundUser: userData });
-    } else {
-      return res.status(400).json('Invalid Username or Password')
-    }
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ message: "Internal server error during login" });
+  if (!email || !password) {
+    throw new ValidationError("Email and Password are required");
   }
+
+  const foundUser = await User.findOne({ email: email });
+  if (!foundUser) {
+    throw new AuthenticationError('Invalid Username or Password');
+  }
+
+  const match = await bcrypt.compare(password, foundUser.password);
+  if (!match) {
+    throw new AuthenticationError('Invalid Username or Password');
+  }
+
+  const token = setUser(foundUser);
+  const userData = sanitizeUser(foundUser);
+
+  return successResponse(res, 200, "User logged in", { token, foundUser: userData });
 }
 
 async function handleUserSignup(req, res) {
-  try {
-    const { firstname, lastname, email, password, role } = req.body;
+  const { firstname, lastname, email, password, role } = req.body;
 
-    if (role && !['admin', 'manager'].includes(role)) {
-      return res.status(403).json({
-        message: "Only admin and manager accounts can be created during signup."
-      });
-    }
-
-    const hashpass = await bcrypt.hash(password, 10);
-    const userData = {
-      firstname: firstname,
-      lastname: lastname,
-      email: email,
-      password: hashpass,
-      role: role || 'manager',
-    };
-    if (req.file) {
-      userData.picture = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype,
-      };
-    }
-
-    const newUser = await User.create(userData);
-    const token = setUser(newUser);
-    let pictureData = null;
-    if (newUser.picture && newUser.picture.data) {
-      pictureData = {
-        data: newUser.picture.data.toString('base64'),
-        contentType: newUser.picture.contentType
-      };
-    }
-
-    const userResponse = {
-      _id: newUser._id,
-      firstname: newUser.firstname,
-      lastname: newUser.lastname,
-      email: newUser.email,
-      role: newUser.role,
-      picture: pictureData
-    };
-    return res.status(201).json({
-      message: 'registered successfully',
-      token,
-      foundUser: userResponse
-    });
+  if (role && !['admin', 'manager'].includes(role)) {
+    throw new ValidationError("Only admin and manager accounts can be created during signup.");
   }
-  catch (error) {
-    console.error("Signup error:", error);
-    res.status(400).json('not registered');
+
+  const hashpass = await bcrypt.hash(password, 10);
+  const userData = {
+    firstname: firstname,
+    lastname: lastname,
+    email: email,
+    password: hashpass,
+    role: role || 'manager',
+  };
+
+  if (req.file) {
+    userData.picture = {
+      data: req.file.buffer,
+      contentType: req.file.mimetype,
+    };
   }
+
+  const newUser = await User.create(userData);
+  const token = setUser(newUser);
+  const userResponse = sanitizeUser(newUser);
+
+  return createdResponse(res, "User registered successfully", { token, foundUser: userResponse });
 }
 
 async function handleForgotPassword(req, res) {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    const foundUser = await User.findOne({ email: email });
-    if (!foundUser) {
-      return res.status(404).json({ message: "Email not found in our database" });
-    }
-
-    return res.status(200).json({ message: "Email verified successfully" });
-  } catch (error) {
-    console.error("Forgot password error:", error);
-    res.status(500).json({ message: "Internal server error during the email verification" });
+  const { email } = req.body;
+  
+  if (!email) {
+    throw new ValidationError("Email is required");
   }
+
+  const foundUser = await User.findOne({ email: email });
+  if (!foundUser) {
+    throw new ValidationError("Email not found in our database");
+  }
+
+  return successResponse(res, 200, "Email verified successfully");
 }
 
 async function handleResetPassword(req, res) {
-  try {
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword) {
-      return res.status(400).json({ message: "Email and new password are required" });
-    }
-
-    const foundUser = await User.findOne({ email: email });
-    if (!foundUser) {
-      return res.status(404).json({ message: "Email not found in our database" });
-    }
-
-    const hashpass = await bcrypt.hash(newPassword, 10);
-
-    await User.findByIdAndUpdate(foundUser._id, { password: hashpass });
-
-    return res.status(200).json({ message: "Password reset successfully" });
-  } catch (error) {
-    console.error("Reset password error:", error);
-    res.status(500).json({ message: "Internal server error during password reset" });
+  const { email, newPassword } = req.body;
+  
+  if (!email || !newPassword) {
+    throw new ValidationError("Email and new password are required");
   }
+
+  const foundUser = await User.findOne({ email: email });
+  if (!foundUser) {
+    throw new ValidationError("Email not found in our database");
+  }
+
+  const hashpass = await bcrypt.hash(newPassword, 10);
+  await User.findByIdAndUpdate(foundUser._id, { password: hashpass });
+
+  return successResponse(res, 200, "Password reset successfully");
 }
 
 module.exports = {
-  handleUserlogin,
-  handleUserSignup,
-  handleForgotPassword,
-  handleResetPassword,
+  handleUserlogin: asyncHandler(handleUserlogin),
+  handleUserSignup: asyncHandler(handleUserSignup),
+  handleForgotPassword: asyncHandler(handleForgotPassword),
+  handleResetPassword: asyncHandler(handleResetPassword),
 }

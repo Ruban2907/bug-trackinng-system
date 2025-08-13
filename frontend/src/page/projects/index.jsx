@@ -50,9 +50,12 @@ const Projects = () => {
       const allUsersData = await allUsersRes.json();
       if (!allUsersRes.ok) throw new Error(allUsersData.message || 'Failed to load users');
 
-      const projectsList = projectsData.projects || [];
+      // Extract data from new response format
+      const projectsList = projectsData.data || projectsData.projects || [];
+      const allUsersList = allUsersData.data || allUsersData.users || [];
+      
       setProjects(projectsList);
-      setUsers(allUsersData.users || []);
+      setUsers(allUsersList);
 
       await fetchProjectBugs(projectsList);
     } catch (err) {
@@ -70,7 +73,9 @@ const Projects = () => {
           const bugsRes = await apiService.authenticatedRequest(`/bugs?projectId=${project._id}`);
           if (bugsRes.ok) {
             const bugsData = await bugsRes.json();
-            return { projectId: project._id, bugs: bugsData.bugs || [] };
+            // Extract data from new response format
+            const bugsList = bugsData.data || bugsData.bugs || [];
+            return { projectId: project._id, bugs: bugsList };
           }
         } catch (error) {
           console.error(`Error fetching bugs for project ${project._id}:`, error);

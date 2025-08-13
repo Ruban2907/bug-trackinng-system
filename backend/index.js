@@ -1,34 +1,76 @@
 const express = require("express");
-const path = require("path");
-const { connectToMongoDb } = require('./config/connect');
-const authRoute = require('./routes/allroutes');
-const app = express();
-const PORT = 8003;
+const cors = require("cors");
+const authRoute = require("./routes/allroutes");
+const { connectToMongoDb } = require("./config/connect");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 
+const app = express();
+const PORT = process.env.PORT || 8003;
+
+// CORS configuration
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:5173');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', true);
-
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
   next();
 });
 
-app.use(express.json());
-connectToMongoDb(process.env.MONGODB ?? "mongodb://localhost:27017/bug-ts");
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Connect to MongoDB
+connectToMongoDb(process.env.MONGODB_URI || "mongodb://localhost:27017/bug-ts")
+  .then(() => {
+    console.log('Connected to MongoDB successfully');
+  })
+  .catch((error) => {
+    console.error('MongoDB connection failed:', error.message);
+    process.exit(1);
+  });
 
+// Routes
 app.use("/", authRoute);
 
-app.use((error, req, res, next) => {
-  console.error('Error:', error);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: error.message
+// Error handling middleware
+app.use(notFound);
+app.use(errorHandler);
+
+// Start server
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+    process.exit(0);
   });
 });
-const server = app.listen(PORT);
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+    process.exit(0);
+  });
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Promise Rejection:', err.message);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err.message);
+  server.close(() => {
+    process.exit(1);
+  });
+});

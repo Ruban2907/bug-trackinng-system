@@ -44,7 +44,7 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
 
       if (projectsRes.ok) {
         const data = await projectsRes.json();
-        setProjects(data.projects || []);
+        setProjects(data.data || data.projects || []);
       } else {
         throw new Error('Failed to fetch projects');
       }
@@ -106,7 +106,7 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
 
       if (response.ok) {
         toast.success('Bug/Feature created successfully!');
-        onBugCreated(data.bug);
+        onBugCreated(data.data);
         onClose();
       } else {
         toast.error(data.message || 'Failed to create bug/feature');
