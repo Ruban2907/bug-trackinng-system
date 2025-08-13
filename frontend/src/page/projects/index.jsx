@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import Layout from '../../shared/Layout';
 import { apiService } from '../../services/api';
 import { toast } from 'react-toastify';
@@ -21,50 +21,90 @@ const Projects = () => {
   const [userInfo, setUserInfo] = useState(null);
   const navigate = useNavigate();
 
+  // Filter users by role - only for admin/manager users
+  const qaUsers = useMemo(() => {
+    if (userInfo?.role === 'admin' || userInfo?.role === 'manager') {
+      return users.filter(user => user.role === 'qa');
+    }
+    return [];
+  }, [users, userInfo?.role]);
+  
+  const developerUsers = useMemo(() => {
+    if (userInfo?.role === 'admin' || userInfo?.role === 'manager') {
+      return users.filter(user => user.role === 'developer');
+    }
+    return [];
+  }, [users, userInfo?.role]);
+
   useEffect(() => {
     const user = getUserInfo();
     if (user) {
       setUserInfo(user);
-      if (user.role === 'qa' || user.role === 'developer') {
-        navigate('/my-projects', { replace: true });
-        return;
-      }
     }
-  }, [navigate]);
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!userInfo || !userInfo.role) {
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      const [projectsRes, usersRes] = await Promise.all([
-        apiService.getProjects(),
-        apiService.authenticatedRequest('/users?role=developer')
-      ]);
+      let projectsRes;
+      if (userInfo.role === 'admin' || userInfo.role === 'manager') {
+        // Admin and managers can see all projects
+        projectsRes = await apiService.getProjects();
+        
+        // Only fetch users for admin/manager users who need to assign users to projects
+        const [usersRes] = await Promise.all([
+          apiService.authenticatedRequest('/users?role=developer')
+        ]);
+
+        const usersData = await usersRes.json();
+        if (!usersRes.ok) throw new Error(usersData.message || 'Failed to load users');
+
+        const allUsersRes = await apiService.authenticatedRequest('/users');
+        const allUsersData = await allUsersRes.json();
+        if (!allUsersRes.ok) throw new Error(allUsersData.message || 'Failed to load users');
+
+        // Extract data from new response format
+        const allUsersList = allUsersData.data || allUsersData.users || [];
+        setUsers(allUsersList);
+      } else if (userInfo.role === 'qa' || userInfo.role === 'developer') {
+        // QA and developers should see only their assigned projects
+        projectsRes = await apiService.getAssignedProjects();
+        
+        // QA and developer users don't need to fetch all users
+        setUsers([]);
+      } else {
+        return;
+      }
 
       const projectsData = await projectsRes.json();
-      const usersData = await usersRes.json();
-
       if (!projectsRes.ok) throw new Error(projectsData.message || 'Failed to load projects');
-      if (!usersRes.ok) throw new Error(usersData.message || 'Failed to load users');
-
-      const allUsersRes = await apiService.authenticatedRequest('/users');
-      const allUsersData = await allUsersRes.json();
-      if (!allUsersRes.ok) throw new Error(allUsersData.message || 'Failed to load users');
 
       // Extract data from new response format
       const projectsList = projectsData.data || projectsData.projects || [];
-      const allUsersList = allUsersData.data || allUsersData.users || [];
-      
       setProjects(projectsList);
-      setUsers(allUsersList);
 
       await fetchProjectBugs(projectsList);
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('Projects page: Error fetching data:', err);
       toast.error(err.message || 'Failed to load data. Please refresh the page.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userInfo]);
+
+  useEffect(() => {
+    if (userInfo && userInfo.role) {
+      // Add a small delay to ensure userInfo is properly set
+      const timer = setTimeout(() => {
+        fetchData();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [userInfo, fetchData]);
 
   const fetchProjectBugs = async (projectsList) => {
     try {
@@ -93,13 +133,6 @@ const Projects = () => {
       console.error('Error fetching project bugs:', error);
     }
   };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-  }, [editingProject]);
 
   const handleCreateProject = async (formData) => {
     try {
@@ -203,9 +236,6 @@ const Projects = () => {
     }
   };
 
-  const qaUsers = useMemo(() => users.filter(user => user.role === 'qa'), [users]);
-  const developerUsers = useMemo(() => users.filter(user => user.role === 'developer'), [users]);
-
   if (!userInfo) {
     return (
       <Layout>
@@ -238,16 +268,25 @@ const Projects = () => {
             </button>
             <div className="h-6 w-px bg-gray-300"></div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-              <p className="text-gray-600 mt-1">Manage your projects and assign team members.</p>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {userInfo?.role === 'admin' || userInfo?.role === 'manager' ? 'Projects' : 'My Assigned Projects'}
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {userInfo?.role === 'admin' || userInfo?.role === 'manager' 
+                  ? 'Manage your projects and assign team members.'
+                  : 'View your assigned projects and their details.'
+                }
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Create Project
-          </button>
+          {(userInfo?.role === 'admin' || userInfo?.role === 'manager') && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Create Project
+            </button>
+          )}
         </div>
       </div>
 
@@ -276,56 +315,69 @@ const Projects = () => {
                 }
                 handleShowDetails(project);
               }}
+              showEditDelete={userInfo?.role === 'admin' || userInfo?.role === 'manager'}
               bugsCount={projectBugs[project._id]?.length || 0}
             />
           ))}
 
           {projects.length === 0 && (
             <div className="col-span-full bg-white rounded-lg shadow p-6 text-center text-gray-600">
-              <p className="text-lg">No projects found.</p>
-              <p className="text-sm mt-2">Create your first project to get started.</p>
+              <p className="text-lg">
+                {userInfo?.role === 'admin' || userInfo?.role === 'manager' 
+                  ? 'No projects found.'
+                  : 'No projects assigned to you yet.'
+                }
+              </p>
+              <p className="text-sm mt-2">
+                {userInfo?.role === 'admin' || userInfo?.role === 'manager'
+                  ? 'Create your first project to get started.'
+                  : 'Contact your manager to get assigned to projects.'
+                }
+              </p>
             </div>
           )}
         </div>
       )}
 
-      {/* Create/Edit Project Modal */}
-      <ProjectFormModal
-        isOpen={isModalOpen || !!editingProject}
-        onClose={() => {
-          try {
-            setIsModalOpen(false);
-            setEditingProject(null);
-          } catch (error) {
-            console.error('Error closing modal:', error);
-          }
-        }}
-        onSubmit={editingProject ?
-          (formData) => {
+      {/* Create/Edit Project Modal - Only for admin/manager users */}
+      {(userInfo?.role === 'admin' || userInfo?.role === 'manager') && (
+        <ProjectFormModal
+          isOpen={isModalOpen || !!editingProject}
+          onClose={() => {
             try {
-              if (!editingProject || !editingProject._id) {
-                toast.error('Invalid project data');
-                return;
+              setIsModalOpen(false);
+              setEditingProject(null);
+            } catch (error) {
+              console.error('Error closing modal:', error);
+            }
+          }}
+          onSubmit={editingProject ?
+            (formData) => {
+              try {
+                if (!editingProject || !editingProject._id) {
+                  toast.error('Invalid project data');
+                  return;
+                }
+                handleUpdateProject(editingProject._id, formData);
+              } catch (error) {
+                console.error('Error submitting update:', error);
+                toast.error('Failed to submit update');
               }
-              handleUpdateProject(editingProject._id, formData);
-            } catch (error) {
-              console.error('Error submitting update:', error);
-              toast.error('Failed to submit update');
-            }
-          } :
-          (formData) => {
-            try {
-              handleCreateProject(formData);
-            } catch (error) {
-              console.error('Error submitting create:', error);
-              toast.error('Failed to submit create');
+            } :
+            (formData) => {
+              try {
+                handleCreateProject(formData);
+              } catch (error) {
+                console.error('Error submitting create:', error);
+                toast.error('Failed to submit create');
+              }
             }
           }
-        }
-        project={editingProject}
-        qaUsers={qaUsers}
-        developerUsers={developerUsers}
-      />
+          project={editingProject}
+          qaUsers={qaUsers}
+          developerUsers={developerUsers}
+        />
+      )}
 
 
 

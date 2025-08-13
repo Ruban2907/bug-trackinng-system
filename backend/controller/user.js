@@ -169,25 +169,40 @@ async function handleUpdateUser(req, res) {
   const { firstname, lastname, email, role } = req.body;
   const currentUser = await User.findById(req.user._id);
 
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-    throw new AuthorizationError("Access denied: Only admins and managers can update users");
+  if (!currentUser) {
+    throw new AuthorizationError("User not authenticated");
   }
 
-  if (!userId) {
-    throw new ValidationError("User ID is required");
-  }
+  let userToUpdate;
+  let isProfileUpdate = false;
 
-  const userToUpdate = await User.findById(userId);
-  if (!userToUpdate) {
-    throw new NotFoundError("User not found");
-  }
+  if (userId) {
+    // Updating another user - requires admin/manager role
+    if (!['admin', 'manager'].includes(currentUser.role)) {
+      throw new AuthorizationError("Access denied: Only admins and managers can update other users");
+    }
 
-  if (!canManageRole(currentUser.role, userToUpdate.role)) {
-    throw new AuthorizationError("Access denied: You cannot update this user");
-  }
+    userToUpdate = await User.findById(userId);
+    if (!userToUpdate) {
+      throw new NotFoundError("User not found");
+    }
 
-  if (role && !canManageRole(currentUser.role, role)) {
-    throw new AuthorizationError(`Access denied: You cannot assign ${role} role`);
+    if (!canManageRole(currentUser.role, userToUpdate.role)) {
+      throw new AuthorizationError("Access denied: You cannot update this user");
+    }
+
+    if (role && !canManageRole(currentUser.role, role)) {
+      throw new AuthorizationError(`Access denied: You cannot assign ${role} role`);
+    }
+  } else {
+    // Updating own profile - any authenticated user
+    isProfileUpdate = true;
+    userToUpdate = currentUser;
+    
+    // Profile updates don't allow role changes
+    if (role) {
+      throw new ValidationError("Role cannot be changed in profile updates");
+    }
   }
 
   if (email && email !== userToUpdate.email) {
@@ -200,7 +215,7 @@ async function handleUpdateUser(req, res) {
   if (firstname) userToUpdate.firstname = firstname;
   if (lastname !== undefined) userToUpdate.lastname = lastname;
   if (email) userToUpdate.email = email;
-  if (role) userToUpdate.role = role;
+  if (role && !isProfileUpdate) userToUpdate.role = role;
 
   if (req.file) {
     userToUpdate.picture = {
@@ -217,7 +232,7 @@ async function handleUpdateUser(req, res) {
       data: userToUpdate.picture.data.toString('base64'),
       contentType: userToUpdate.picture.contentType
     };
-  }
+  } 
 
   const userResponse = {
     _id: userToUpdate._id,
@@ -229,7 +244,8 @@ async function handleUpdateUser(req, res) {
     createdAt: userToUpdate.createdAt
   };
 
-  return successResponse(res, 200, 'User updated successfully', userResponse);
+  const message = isProfileUpdate ? 'Profile updated successfully' : 'User updated successfully';
+  return successResponse(res, 200, message, userResponse);
 }
 
 async function handleDeleteUser(req, res) {
@@ -294,59 +310,7 @@ async function handleGetCurrentUser(req, res) {
   return successResponse(res, 200, 'Current user retrieved successfully', userResponse);
 }
 
-async function handleUpdateProfile(req, res) {
-  const currentUser = req.user;
-  if (!currentUser) {
-    throw new AuthorizationError("User not authenticated");
-  }
 
-  const { firstname, lastname, email } = req.body;
-
-  const user = await User.findById(currentUser._id);
-  if (!user) {
-    throw new NotFoundError("User not found");
-  }
-
-  if (email && email !== user.email) {
-    const existingUser = await User.findOne({ email: email });
-    if (existingUser) {
-      throw new ConflictError("User with this email already exists");
-    }
-  }
-
-  if (firstname) user.firstname = firstname;
-  if (lastname !== undefined) user.lastname = lastname;
-  if (email) user.email = email;
-
-  if (req.file) {
-    user.picture = {
-      data: req.file.buffer,
-      contentType: req.file.mimetype,
-    };
-  }
-
-  await user.save();
-
-  let pictureData = null;
-  if (user.picture && user.picture.data) {
-    pictureData = {
-      data: user.picture.data.toString('base64'),
-      contentType: user.picture.contentType
-    };
-  }
-
-  const userResponse = {
-    _id: user._id,
-    firstname: user.firstname,
-    lastname: user.lastname,
-    email: user.email,
-    role: user.role,
-    picture: pictureData,
-    createdAt: user.createdAt
-  };
-
-  return successResponse(res, 200, 'Profile updated successfully', userResponse);
-}
 
 module.exports = {
   handleCreateUser: asyncHandler(handleCreateUser),
@@ -354,6 +318,5 @@ module.exports = {
   handleGetUserById: asyncHandler(handleGetUserById),
   handleUpdateUser: asyncHandler(handleUpdateUser),
   handleDeleteUser: asyncHandler(handleDeleteUser),
-  handleGetCurrentUser: asyncHandler(handleGetCurrentUser),
-  handleUpdateProfile: asyncHandler(handleUpdateProfile)
+  handleGetCurrentUser: asyncHandler(handleGetCurrentUser)
 };

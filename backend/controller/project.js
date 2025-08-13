@@ -187,32 +187,51 @@ async function handleGetAllProjects(req, res) {
 
 async function handleGetAssignedProjects(req, res) {
   const currentUser = req.user;
+  
   if (!currentUser || !['qa', 'developer'].includes(currentUser.role)) {
     throw new AuthorizationError("Access denied: Only QA engineers and developers can access this endpoint");
   }
 
-  const projects = await Project.find()
-    .populate('createdBy', 'firstname lastname email role')
-    .populate('qaAssigned', 'firstname lastname email role picture')
-    .populate('developersAssigned', 'firstname lastname email role picture')
-    .sort({ createdAt: -1 });
+  try {
+    const projects = await Project.find()
+      .populate('createdBy', 'firstname lastname email role')
+      .populate('qaAssigned', 'firstname lastname email role picture')
+      .populate('developersAssigned', 'firstname lastname email role picture')
+      .sort({ createdAt: -1 });
 
-  let assignedProjects = [];
-  if (currentUser.role === 'qa') {
-    assignedProjects = projects.filter(project =>
-      project.qaAssigned &&
-      project.qaAssigned.some(qa => qa._id.toString() === currentUser._id.toString())
-    );
-  } else if (currentUser.role === 'developer') {
-    assignedProjects = projects.filter(project =>
-      project.developersAssigned &&
-      project.developersAssigned.some(dev => dev._id.toString() === currentUser._id.toString())
-    );
+    let assignedProjects = [];
+    if (currentUser.role === 'qa') {
+      assignedProjects = projects.filter(project => {
+        if (!project.qaAssigned || project.qaAssigned.length === 0) {
+          return false;
+        }
+        
+        return project.qaAssigned.some(qa => {
+          const qaId = qa._id ? qa._id.toString() : qa.toString();
+          const userId = currentUser._id.toString();
+          return qaId === userId;
+        });
+      });
+    } else if (currentUser.role === 'developer') {
+      assignedProjects = projects.filter(project => {
+        if (!project.developersAssigned || project.developersAssigned.length === 0) {
+          return false;
+        }
+        return project.developersAssigned.some(dev => {
+          const devId = dev._id ? dev._id.toString() : dev.toString();
+          const userId = currentUser._id.toString();
+          return devId === userId;
+        });
+      });
+    }
+
+    const serialized = assignedProjects.map(serializeProject);
+
+    return successResponse(res, 200, 'Assigned projects retrieved successfully', serialized);
+  } catch (error) {
+    console.error('Error in handleGetAssignedProjects:', error);
+    throw error;
   }
-
-  const serialized = assignedProjects.map(serializeProject);
-
-  return successResponse(res, 200, 'Assigned projects retrieved successfully', serialized);
 }
 
 async function handleGetProjectById(req, res) {

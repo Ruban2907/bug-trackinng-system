@@ -26,6 +26,15 @@ const isDeveloperInProject = (project, developerId) => {
   );
 };
 
+const isQAInProject = (project, qaId) => {
+  if (!project.qaAssigned || project.qaAssigned.length === 0) {
+    return false;
+  }
+  return project.qaAssigned.some(qa => 
+    qa._id ? qa._id.toString() === qaId : qa.toString() === qaId
+  );
+};
+
 const populateBug = async (bug) => {
   return await bug.populate([
     { path: 'createdBy', select: 'firstname lastname email role' },
@@ -60,6 +69,13 @@ async function handleCreateBug(req, res) {
 
   if (!checkProjectAccess(currentUser, project)) {
     throw new AuthorizationError("Access denied: You can only create bugs in projects assigned to you");
+  }
+
+  // Additional check for QA users to ensure they are assigned to the project
+  if (currentUser.role === 'qa') {
+    if (!isQAInProject(project, currentUser._id)) {
+      throw new AuthorizationError("Access denied: You can only create bugs in projects assigned to you");
+    }
   }
 
   if (!project.developersAssigned || project.developersAssigned.length === 0) {
@@ -116,9 +132,6 @@ async function handleGetAllBugs(req, res) {
   }
 
   let query = {};
-  if (projectId) {
-    query.projectId = projectId;
-  }
 
   if (currentUser.role === 'developer') {
     query.assignedTo = currentUser._id;
@@ -126,7 +139,28 @@ async function handleGetAllBugs(req, res) {
     const userProjects = await Project.find({
       qaAssigned: currentUser._id
     }).select('_id');
-    query.projectId = { $in: userProjects.map(p => p._id) };
+    
+    if (userProjects.length === 0) {
+      // QA user not assigned to any projects - return empty result with clear message
+      return successResponse(res, 200, 'No bugs found. You are not assigned to any projects. Please contact an administrator to be assigned to a project.', []);
+    }
+    
+    // If a specific project is requested, verify QA has access to it
+    if (projectId) {
+      const hasAccess = userProjects.some(p => p._id.toString() === projectId);
+      if (!hasAccess) {
+        throw new AuthorizationError("Access denied: You can only view bugs in projects assigned to you");
+      }
+      query.projectId = projectId;
+    } else {
+      // If no specific project, show bugs from all assigned projects
+      query.projectId = { $in: userProjects.map(p => p._id) };
+    }
+  } else {
+    // For admin/manager users, apply project filter if provided
+    if (projectId) {
+      query.projectId = projectId;
+    }
   }
 
   const bugs = await Bug.find(query)
@@ -167,7 +201,11 @@ async function handleGetBugById(req, res) {
 
   if (currentUser.role === 'qa') {
     const project = await Project.findById(bug.projectId._id);
-    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+    if (!project) {
+      throw new NotFoundError("Project not found");
+    }
+    
+    if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only view bugs in projects assigned to you");
     }
   }
@@ -204,7 +242,11 @@ async function handleUpdateBug(req, res) {
 
   if (currentUser.role === 'qa') {
     const project = await Project.findById(bug.projectId);
-    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+    if (!project) {
+      throw new NotFoundError("Project not found");
+    }
+    
+    if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only update bugs in projects assigned to you");
     }
   }
@@ -259,7 +301,11 @@ async function handleDeleteBug(req, res) {
 
   if (currentUser.role === 'qa') {
     const project = await Project.findById(bug.projectId);
-    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+    if (!project) {
+      throw new NotFoundError("Project not found");
+    }
+    
+    if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only delete bugs in projects assigned to you");
     }
   }
@@ -299,7 +345,11 @@ async function handleUpdateBugStatus(req, res) {
 
   if (currentUser.role === 'qa') {
     const project = await Project.findById(bug.projectId);
-    if (!project.qaAssigned.some(qa => qa.toString() === currentUser._id.toString())) {
+    if (!project) {
+      throw new NotFoundError("Project not found");
+    }
+    
+    if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only update bugs in projects assigned to you");
     }
   }

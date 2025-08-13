@@ -90,7 +90,7 @@ const Header = () => {
                 onClick={() => navigate("/my-projects")}
                 className="text-gray-700 hover:text-blue-600 transition-colors font-medium"
               >
-                Projects
+                My Projects
               </button>
             )}
 
@@ -162,7 +162,7 @@ const Header = () => {
               onClick={() => navigate("/my-projects")}
               className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
             >
-              Projects
+              My Projects
             </button>
           )}
 

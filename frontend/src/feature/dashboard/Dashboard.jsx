@@ -54,7 +54,7 @@ const DashboardPage = () => {
       }
 
       if (userInfo && (userInfo.role === 'qa' || userInfo.role === 'developer')) {
-        const projectsRes = await apiService.authenticatedRequest('/assigned-projects');
+        const projectsRes = await apiService.authenticatedRequest('/projects/assigned-projects');
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json();
           // Extract data from new response format
@@ -70,13 +70,23 @@ const DashboardPage = () => {
       let bugs = [];
 
       if (userInfo.role === 'admin' || userInfo.role === 'manager') {
+        // Admin and managers can see all bugs
         const bugsRes = await apiService.authenticatedRequest('/bugs');
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
           // Extract data from new response format
           bugs = bugsData.data || bugsData.bugs || [];
         }
-      } else {
+      } else if (userInfo.role === 'qa') {
+        // QA users can only see bugs from projects they're assigned to
+        const bugsRes = await apiService.authenticatedRequest('/bugs');
+        if (bugsRes.ok) {
+          const bugsData = await bugsRes.json();
+          // Extract data from new response format
+          bugs = bugsData.data || bugsData.bugs || [];
+        }
+      } else if (userInfo.role === 'developer') {
+        // Developers can only see bugs assigned to them
         const bugsRes = await apiService.authenticatedRequest('/bugs');
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
@@ -236,6 +246,8 @@ const DashboardPage = () => {
             </p>
           </div>
         </div>
+
+
 
         <div className="border-t pt-6">
           <h3 className="text-lg font-medium mb-4">Quick Actions</h3>

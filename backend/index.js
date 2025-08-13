@@ -1,6 +1,9 @@
 const express = require("express");
 const cors = require("cors");
-const authRoute = require("./routes/allroutes");
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
+const projectRoutes = require("./routes/projectRoutes");
+const bugRoutes = require("./routes/bugRoutes");
 const { connectToMongoDb } = require("./config/connect");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
@@ -33,44 +36,16 @@ connectToMongoDb(process.env.MONGODB_URI || "mongodb://localhost:27017/bug-ts")
   });
 
 // Routes
-app.use("/", authRoute);
+app.use("/", authRoutes);
+app.use("/users", userRoutes);
+app.use("/projects", projectRoutes);
+app.use("/bugs", bugRoutes);
 
 // Error handling middleware
 app.use(notFound);
 app.use(errorHandler);
 
 // Start server
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-    process.exit(0);
-  });
-});
-
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Promise Rejection:', err.message);
-  server.close(() => {
-    process.exit(1);
-  });
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err.message);
-  server.close(() => {
-    process.exit(1);
-  });
 });

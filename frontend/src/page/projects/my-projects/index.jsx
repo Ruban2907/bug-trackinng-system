@@ -70,7 +70,16 @@ const MyProjects = () => {
             const bugsData = await bugsRes.json();
             // Extract data from new response format
             const bugsList = bugsData.data || bugsData.bugs || [];
-            return { projectId: project._id, bugs: bugsList };
+            
+            // Additional safety check: ensure bugs actually belong to this project
+            const filteredBugs = bugsList.filter(bug => {
+              const bugProjectId = bug.projectId?._id || bug.projectId;
+              return bugProjectId === project._id;
+            });
+            
+            console.log(`Project ${project.name} (${project._id}): Fetched ${bugsList.length} bugs, filtered to ${filteredBugs.length} bugs`);
+            
+            return { projectId: project._id, bugs: filteredBugs };
           }
         } catch (error) {
           console.error(`Error fetching bugs for project ${project._id}:`, error);
@@ -83,6 +92,7 @@ const MyProjects = () => {
       bugsResults.forEach(result => {
         bugsMap[result.projectId] = result.bugs;
       });
+      
       setProjectBugs(bugsMap);
     } catch (error) {
       console.error('Error fetching project bugs:', error);
@@ -102,11 +112,15 @@ const MyProjects = () => {
   const handleBugUpdated = (updatedBug) => {
     setProjectBugs(prev => {
       const newState = { ...prev };
-      Object.keys(newState).forEach(projectId => {
-        newState[projectId] = newState[projectId].map(bug =>
-          bug._id === updatedBug._id ? updatedBug : bug
-        );
-      });
+      // Only update bugs in the project that the bug belongs to
+      if (updatedBug.projectId) {
+        const projectId = updatedBug.projectId._id || updatedBug.projectId;
+        if (newState[projectId]) {
+          newState[projectId] = newState[projectId].map(bug =>
+            bug._id === updatedBug._id ? updatedBug : bug
+          );
+        }
+      }
       return newState;
     });
     toast.success('Bug updated successfully');
@@ -131,9 +145,13 @@ const MyProjects = () => {
         toast.success('Bug deleted successfully');
         setProjectBugs(prev => {
           const newState = { ...prev };
-          Object.keys(newState).forEach(projectId => {
-            newState[projectId] = newState[projectId].filter(bug => bug._id !== bugToDelete._id);
-          });
+          // Only delete bugs from the project that the bug belongs to
+          if (bugToDelete.projectId) {
+            const projectId = bugToDelete.projectId._id || bugToDelete.projectId;
+            if (newState[projectId]) {
+              newState[projectId] = newState[projectId].filter(bug => bug._id !== bugToDelete._id);
+            }
+          }
           return newState;
         });
       }
@@ -163,10 +181,15 @@ const MyProjects = () => {
         toast.success('Bug status updated successfully');
         setProjectBugs(prev => {
           const newState = { ...prev };
+          // Find which project contains this bug and update only that project
           Object.keys(newState).forEach(projectId => {
-            newState[projectId] = newState[projectId].map(bug =>
-              bug._id === bugId ? { ...bug, status: newStatus } : bug
-            );
+            const bugIndex = newState[projectId].findIndex(bug => bug._id === bugId);
+            if (bugIndex !== -1) {
+              // Found the bug in this project, update only this project
+              newState[projectId] = newState[projectId].map(bug =>
+                bug._id === bugId ? { ...bug, status: newStatus } : bug
+              );
+            }
           });
           return newState;
         });
@@ -231,16 +254,29 @@ const MyProjects = () => {
                 project={project}
                 showEditDelete={false}
                 showDetails={false}
-                bugsCount={projectBugs[project._id]?.length || 0}
+                bugsCount={
+                  projectBugs[project._id] 
+                    ? projectBugs[project._id].filter(bug => {
+                        // Ensure bug belongs to this specific project
+                        const bugProjectId = bug.projectId?._id || bug.projectId;
+                        return bugProjectId === project._id;
+                      }).length 
+                    : 0
+                }
               />
 
               {/* Project Bugs Section */}
               {projectBugs[project._id] && projectBugs[project._id].length > 0 && (
                 <div className="mt-6 border-t pt-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Bugs</h3>
-
                   <div className="space-y-4">
-                                          {projectBugs[project._id].map(bug => (
+                    {projectBugs[project._id]
+                      .filter(bug => {
+                        // Ensure bug belongs to this specific project
+                        const bugProjectId = bug.projectId?._id || bug.projectId;
+                        return bugProjectId === project._id;
+                      })
+                      .map(bug => (
                         userInfo.role === 'qa' ? (
                           <BugCard
                             key={bug._id}

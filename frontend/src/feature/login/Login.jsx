@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { setUserInfo, isAuthenticated } from "../../utils/userUtils";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { apiService } from '../../services/api';
 import { toast } from 'react-toastify';
-import { apiService } from "../../services/api";
+import { setUserInfo } from '../../utils/userUtils';
 
 const LoginPage = () => {
   const [form, setForm] = useState({
@@ -19,12 +19,6 @@ const LoginPage = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (isAuthenticated()) {
-      navigate("/dashboard");
-    }
-  }, [navigate]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -58,7 +52,7 @@ const LoginPage = () => {
       }
 
       if (data.foundUser) {
-        setUserInfo(data.foundUser);
+        setUserInfo(data.foundUser); // Store in localStorage
       }
 
       // Navigate to dashboard immediately after setting auth data

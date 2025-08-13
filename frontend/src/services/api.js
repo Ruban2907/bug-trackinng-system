@@ -57,6 +57,7 @@ export const apiService = {
         ...options.headers,
       },
     });
+    
     return response;
   },
 
@@ -90,8 +91,9 @@ export const apiService = {
       `/projects/${projectId}/assign-developers`,
       { method: "POST", body: JSON.stringify({ developerIds }) }
     ),
-  getAssignedProjects: () =>
-    apiService.authenticatedRequest("/assigned-projects", { method: "GET" }),
+  getAssignedProjects: () => {
+    return apiService.authenticatedRequest("/projects/assigned-projects", { method: "GET" });
+  },
 
   getBugs: (projectId) => {
     const endpoint = projectId ? `/bugs?projectId=${projectId}` : "/bugs";

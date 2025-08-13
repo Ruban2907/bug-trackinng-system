@@ -40,6 +40,11 @@ const Bugs = () => {
     }
   }, [userInfo, selectedProject]);
 
+  // Debug effect to see when selectedProject changes
+  useEffect(() => {
+    console.log('selectedProject changed to:', selectedProject);
+  }, [selectedProject]);
+
   const fetchProjects = async () => {
     try {
       let projectsRes;
@@ -53,22 +58,36 @@ const Bugs = () => {
         const data = await projectsRes.json();
         // Extract data from new response format
         const projectsList = data.data || data.projects || [];
+        console.log(`Loaded ${projectsList.length} projects for user role ${userInfo?.role}:`, projectsList.map(p => ({ id: p._id, name: p.name })));
         setProjects(projectsList);
+        
+        // Show helpful message for QA users with no projects
+        if (userInfo?.role === 'qa' && projectsList.length === 0) {
+          toast.info('No projects are currently assigned to you. Please contact your manager to get assigned to projects.');
+        }
+      } else {
+        if (userInfo?.role === 'qa') {
+          toast.error('Failed to load your assigned projects. Please try again or contact support.');
+        }
       }
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      if (userInfo?.role === 'qa') {
+        toast.error('Failed to load your assigned projects. Please try again.');
+      }
     }
   };
 
   const fetchBugs = async () => {
     try {
       setIsLoading(true);
+      console.log(`Fetching bugs for project: ${selectedProject || 'All Projects'}`);
       const response = await apiService.getBugs(selectedProject);
       const data = await response.json();
 
       if (response.ok) {
         // Extract data from new response format
         const bugsList = data.data || data.bugs || [];
+        console.log(`Received ${bugsList.length} bugs for project: ${selectedProject || 'All Projects'}`);
         setBugs(bugsList);
       } else {
         toast.error(data.message || 'Failed to load bugs');
@@ -158,6 +177,8 @@ const Bugs = () => {
 
   const canCreateBug = userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager' || userInfo.role === 'qa');
 
+
+
   if (!userInfo) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -198,6 +219,8 @@ const Bugs = () => {
         </div>
       </div>
 
+
+
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex items-center space-x-4">
@@ -206,6 +229,7 @@ const Bugs = () => {
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+
           >
             <option value="">All Projects</option>
             {projects.map(project => (
@@ -269,6 +293,25 @@ const Bugs = () => {
                   Create Your First Bug/Feature
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Show helpful message for QA users with no projects */}
+          {userInfo?.role === 'qa' && projects.length === 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+              <div className="text-blue-400 text-4xl mb-4">📋</div>
+              <h3 className="text-lg font-medium text-blue-900 mb-2">No Projects Assigned</h3>
+              <p className="text-blue-700 mb-4">
+                You don't have any projects assigned to you yet. This is why you can't see any bugs or create new ones.
+              </p>
+              <div className="text-sm text-blue-600">
+                <p>To get started:</p>
+                <ul className="mt-2 space-y-1">
+                  <li>• Contact your manager or admin to assign you to projects</li>
+                  <li>• Once assigned, you'll be able to view project bugs and create new ones</li>
+                  <li>• You can also report bugs through other channels in the meantime</li>
+                </ul>
+              </div>
             </div>
           )}
         </div>
