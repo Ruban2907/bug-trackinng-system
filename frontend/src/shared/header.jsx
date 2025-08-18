@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserInfo, clearUserInfo } from '../utils/userUtils';
+import { getUserInfo, clearUserInfo, rehydrateUserInfo } from '../utils/userUtils';
 import ProfilePicture from './ProfilePicture';
 import { toast } from 'react-toastify';
 
 const Header = () => {
   const navigate = useNavigate();
   const [userInfo, setUserInfo] = useState(null);
+  const role = (userInfo?.role || '').toLowerCase();
 
   useEffect(() => {
-    const user = getUserInfo();
-    setUserInfo(user);
+    const init = async () => {
+      const user = getUserInfo();
+      if (!user) {
+        const rehydrated = await rehydrateUserInfo();
+        setUserInfo(rehydrated);
+      } else {
+        setUserInfo(user);
+      }
+    };
+    init();
   }, []);
 
   useEffect(() => {
@@ -68,7 +77,7 @@ const Header = () => {
               Dashboard
             </button>
 
-            {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
+            {(role === 'admin' || role === 'manager') && (
               <>
                 <button
                   onClick={() => navigate("/projects")}
@@ -85,7 +94,7 @@ const Header = () => {
               </>
             )}
 
-            {(userInfo.role === 'qa' || userInfo.role === 'developer') && (
+            {(role === 'qa' || role === 'developer') && (
               <button
                 onClick={() => navigate("/my-projects")}
                 className="text-gray-700 hover:text-blue-600 transition-colors font-medium"
@@ -140,7 +149,7 @@ const Header = () => {
             Dashboard
           </button>
 
-          {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
+          {(role === 'admin' || role === 'manager') && (
             <>
               <button
                 onClick={() => navigate("/projects")}
@@ -157,7 +166,7 @@ const Header = () => {
             </>
           )}
 
-          {(userInfo.role === 'qa' || userInfo.role === 'developer') && (
+          {(role === 'qa' || role === 'developer') && (
             <button
               onClick={() => navigate("/my-projects")}
               className="block w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-md"

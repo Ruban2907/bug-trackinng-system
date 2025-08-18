@@ -6,7 +6,7 @@ import ProjectCard from '../../feature/projects/ProjectCard';
 import ProjectFormModal from '../../feature/projects/ProjectFormModal';
 import ConfirmationModal from '../../shared/ConfirmationModal';
 import { useNavigate } from 'react-router-dom';
-import { getUserInfo } from '../../utils/userUtils';
+import { getUserInfo, rehydrateUserInfo } from '../../utils/userUtils';
 
 const Projects = () => {
   const [projects, setProjects] = useState([]);
@@ -37,10 +37,25 @@ const Projects = () => {
   }, [users, userInfo?.role]);
 
   useEffect(() => {
-    const user = getUserInfo();
-    if (user) {
-      setUserInfo(user);
-    }
+    const init = async () => {
+      const existing = getUserInfo();
+      if (existing) {
+        setUserInfo(existing);
+      } else {
+        const rehydrated = await rehydrateUserInfo();
+        setUserInfo(rehydrated);
+      }
+    };
+    init();
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const updated = getUserInfo();
+      setUserInfo(updated);
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -54,22 +69,28 @@ const Projects = () => {
       if (userInfo.role === 'admin' || userInfo.role === 'manager') {
         // Admin and managers can see all projects
         projectsRes = await apiService.getProjects();
-        
-        // Only fetch users for admin/manager users who need to assign users to projects
-        const [usersRes] = await Promise.all([
+
+        // Fetch only allowed roles with explicit filters to satisfy backend RBAC
+        const [qaRes, devRes] = await Promise.all([
+          apiService.authenticatedRequest('/users?role=qa'),
           apiService.authenticatedRequest('/users?role=developer')
         ]);
 
-        const usersData = await usersRes.json();
-        if (!usersRes.ok) throw new Error(usersData.message || 'Failed to load users');
+        const qaData = await qaRes.json();
+        const devData = await devRes.json();
 
-        const allUsersRes = await apiService.authenticatedRequest('/users');
-        const allUsersData = await allUsersRes.json();
-        if (!allUsersRes.ok) throw new Error(allUsersData.message || 'Failed to load users');
+        if (!qaRes.ok) throw new Error(qaData.message || 'Failed to load QA users');
+        if (!devRes.ok) throw new Error(devData.message || 'Failed to load developer users');
 
-        // Extract data from new response format
-        const allUsersList = allUsersData.data || allUsersData.users || [];
-        setUsers(allUsersList);
+        const qaList = qaData.data || qaData.users || [];
+        const devList = devData.data || devData.users || [];
+
+        // Merge and de-duplicate by _id
+        const map = new Map();
+        [...qaList, ...devList].forEach(u => {
+          if (u && u._id) map.set(u._id, u);
+        });
+        setUsers(Array.from(map.values()));
       } else if (userInfo.role === 'qa' || userInfo.role === 'developer') {
         // QA and developers should see only their assigned projects
         projectsRes = await apiService.getAssignedProjects();

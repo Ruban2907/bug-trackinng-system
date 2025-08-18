@@ -1,7 +1,7 @@
 const Bug = require("../model/bug");
 const Project = require("../model/project");
 const User = require("../model/user");
-const { successResponse, createdResponse, errorResponse, notFoundResponse, forbiddenResponse, validationErrorResponse } = require("../utils/responseHandler");
+const { successResponse, createdResponse } = require("../utils/responseHandler");
 const { ValidationError, AuthorizationError, NotFoundError } = require("../utils/errors");
 const { asyncHandler } = require("../middleware/errorHandler");
 
@@ -15,13 +15,13 @@ const serializeBug = (bug) => {
 
 const checkProjectAccess = (currentUser, project) => {
   return currentUser.role === 'admin' ||
-         currentUser.role === 'manager' ||
-         project.qaAssigned.some(qa => qa._id ? qa._id.toString() === currentUser._id.toString() : qa.toString() === currentUser._id.toString()) ||
-         project.developersAssigned.some(dev => dev._id ? dev._id.toString() === currentUser._id.toString() : dev.toString() === currentUser._id.toString());
+    currentUser.role === 'manager' ||
+    project.qaAssigned.some(qa => qa._id ? qa._id.toString() === currentUser._id.toString() : qa.toString() === currentUser._id.toString()) ||
+    project.developersAssigned.some(dev => dev._id ? dev._id.toString() === currentUser._id.toString() : dev.toString() === currentUser._id.toString());
 };
 
 const isDeveloperInProject = (project, developerId) => {
-  return project.developersAssigned.some(dev => 
+  return project.developersAssigned.some(dev =>
     dev._id ? dev._id.toString() === developerId : dev.toString() === developerId
   );
 };
@@ -30,26 +30,51 @@ const isQAInProject = (project, qaId) => {
   if (!project.qaAssigned || project.qaAssigned.length === 0) {
     return false;
   }
-  return project.qaAssigned.some(qa => 
+  return project.qaAssigned.some(qa =>
     qa._id ? qa._id.toString() === qaId : qa.toString() === qaId
   );
 };
 
-const populateBug = async (bug) => {
-  return await bug.populate([
-    { path: 'createdBy', select: 'firstname lastname email role' },
-    { path: 'assignedTo', select: 'firstname lastname email role' },
-    { path: 'projectId', select: 'name developersAssigned' }
-  ]);
+const populateBug = async (bug) => bug.populate([
+  { path: 'createdBy', select: 'firstname lastname email role' },
+  { path: 'assignedTo', select: 'firstname lastname email role' },
+  { path: 'projectId', select: 'name developersAssigned' }
+]);
+
+const getUserOrThrow = (req) => {
+  const user = req.user;
+  if (!user) throw new AuthorizationError("User not authenticated");
+  return user;
 };
+
+const validateIdOrThrow = (value, message) => {
+  if (!value) throw new ValidationError(message);
+};
+
+const findBugOrThrow = async (bugId) => {
+  validateIdOrThrow(bugId, "Bug ID is required");
+  const bug = await Bug.findById(bugId);
+  if (!bug) throw new NotFoundError("Bug not found");
+  return bug;
+};
+
+const attachScreenshotIfExists = (file, target) => {
+  if (!file) return;
+  target.screenshot = { data: file.buffer, contentType: file.mimetype };
+};
+
+// const ensureQaAccessByProjectId = async (projectId, qaUserId, forbiddenMessage) => {
+//   const project = await Project.findById(projectId);
+//   if (!project) throw new NotFoundError("Project not found");
+//   if (!isQAInProject(project, qaUserId)) {
+//     throw new AuthorizationError(forbiddenMessage);
+//   }
+// };
 
 async function handleCreateBug(req, res) {
   const { title, type, status, description, deadline, projectId, assignedTo } = req.body;
 
-  const currentUser = req.user;
-  if (!currentUser) {
-    throw new AuthorizationError("User not authenticated");
-  }
+  const currentUser = getUserOrThrow(req);
 
   if (currentUser.role === 'developer') {
     throw new AuthorizationError("Access denied: Developers cannot create bugs");
@@ -110,12 +135,7 @@ async function handleCreateBug(req, res) {
     assignedTo: assignedDeveloperId,
   };
 
-  if (req.file) {
-    bugData.screenshot = {
-      data: req.file.buffer,
-      contentType: req.file.mimetype,
-    };
-  }
+  attachScreenshotIfExists(req.file, bugData);
 
   const newBug = await Bug.create(bugData);
   await populateBug(newBug);
@@ -125,11 +145,7 @@ async function handleCreateBug(req, res) {
 
 async function handleGetAllBugs(req, res) {
   const { projectId } = req.query;
-  const currentUser = req.user;
-
-  if (!currentUser) {
-    throw new AuthorizationError("User not authenticated");
-  }
+  const currentUser = getUserOrThrow(req);
 
   let query = {};
 
@@ -139,12 +155,12 @@ async function handleGetAllBugs(req, res) {
     const userProjects = await Project.find({
       qaAssigned: currentUser._id
     }).select('_id');
-    
+
     if (userProjects.length === 0) {
       // QA user not assigned to any projects - return empty result with clear message
       return successResponse(res, 200, 'No bugs found. You are not assigned to any projects. Please contact an administrator to be assigned to a project.', []);
     }
-    
+
     // If a specific project is requested, verify QA has access to it
     if (projectId) {
       const hasAccess = userProjects.some(p => p._id.toString() === projectId);
@@ -176,15 +192,9 @@ async function handleGetAllBugs(req, res) {
 
 async function handleGetBugById(req, res) {
   const { bugId } = req.params;
-  const currentUser = req.user;
+  const currentUser = getUserOrThrow(req);
 
-  if (!currentUser) {
-    throw new AuthorizationError("User not authenticated");
-  }
-
-  if (!bugId) {
-    throw new ValidationError("Bug ID is required");
-  }
+  validateIdOrThrow(bugId, "Bug ID is required");
 
   const bug = await Bug.findById(bugId)
     .populate('createdBy', 'firstname lastname email role')
@@ -204,7 +214,7 @@ async function handleGetBugById(req, res) {
     if (!project) {
       throw new NotFoundError("Project not found");
     }
-    
+
     if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only view bugs in projects assigned to you");
     }
@@ -216,20 +226,11 @@ async function handleGetBugById(req, res) {
 async function handleUpdateBug(req, res) {
   const { bugId } = req.params;
   const { title, type, status, description, deadline, assignedTo } = req.body;
-  const currentUser = req.user;
+  const currentUser = getUserOrThrow(req);
 
-  if (!currentUser) {
-    throw new AuthorizationError("User not authenticated");
-  }
+  validateIdOrThrow(bugId, "Bug ID is required");
 
-  if (!bugId) {
-    throw new ValidationError("Bug ID is required");
-  }
-
-  const bug = await Bug.findById(bugId);
-  if (!bug) {
-    throw new NotFoundError("Bug not found");
-  }
+  const bug = await findBugOrThrow(bugId);
 
   if (currentUser.role === 'developer') {
     if (bug.assignedTo.toString() !== currentUser._id.toString()) {
@@ -245,7 +246,7 @@ async function handleUpdateBug(req, res) {
     if (!project) {
       throw new NotFoundError("Project not found");
     }
-    
+
     if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only update bugs in projects assigned to you");
     }
@@ -265,12 +266,7 @@ async function handleUpdateBug(req, res) {
     bug.assignedTo = assignedTo;
   }
 
-  if (req.file) {
-    bug.screenshot = {
-      data: req.file.buffer,
-      contentType: req.file.mimetype,
-    };
-  }
+  attachScreenshotIfExists(req.file, bug);
 
   await bug.save();
   await populateBug(bug);
@@ -280,20 +276,11 @@ async function handleUpdateBug(req, res) {
 
 async function handleDeleteBug(req, res) {
   const { bugId } = req.params;
-  const currentUser = req.user;
+  const currentUser = getUserOrThrow(req);
 
-  if (!currentUser) {
-    throw new AuthorizationError("User not authenticated");
-  }
+  validateIdOrThrow(bugId, "Bug ID is required");
 
-  if (!bugId) {
-    throw new ValidationError("Bug ID is required");
-  }
-
-  const bug = await Bug.findById(bugId);
-  if (!bug) {
-    throw new NotFoundError("Bug not found");
-  }
+  const bug = await findBugOrThrow(bugId);
 
   if (currentUser.role === 'developer') {
     throw new AuthorizationError("Access denied: Developers cannot delete bugs");
@@ -304,7 +291,7 @@ async function handleDeleteBug(req, res) {
     if (!project) {
       throw new NotFoundError("Project not found");
     }
-    
+
     if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only delete bugs in projects assigned to you");
     }
@@ -318,24 +305,12 @@ async function handleDeleteBug(req, res) {
 async function handleUpdateBugStatus(req, res) {
   const { bugId } = req.params;
   const { status } = req.body;
-  const currentUser = req.user;
+  const currentUser = getUserOrThrow(req);
 
-  if (!currentUser) {
-    throw new AuthorizationError("User not authenticated");
-  }
+  validateIdOrThrow(bugId, "Bug ID is required");
+  if (!status) throw new ValidationError("Status is required");
 
-  if (!bugId) {
-    throw new ValidationError("Bug ID is required");
-  }
-
-  if (!status) {
-    throw new ValidationError("Status is required");
-  }
-
-  const bug = await Bug.findById(bugId);
-  if (!bug) {
-    throw new NotFoundError("Bug not found");
-  }
+  const bug = await findBugOrThrow(bugId);
 
   if (currentUser.role === 'developer') {
     if (bug.assignedTo.toString() !== currentUser._id.toString()) {
@@ -348,7 +323,7 @@ async function handleUpdateBugStatus(req, res) {
     if (!project) {
       throw new NotFoundError("Project not found");
     }
-    
+
     if (!isQAInProject(project, currentUser._id)) {
       throw new AuthorizationError("Access denied: You can only update bugs in projects assigned to you");
     }

@@ -22,7 +22,7 @@ router.post("/",
   upload.single("picture"), 
   validateRequiredFields(['name']),
   sanitizeStrings(['name', 'description']),
-  handleCreateProject
+  handleCreateProject 
 );
 
 router.get("/", authenticate, requireManagerOrAdmin, handleGetAllProjects);

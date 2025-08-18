@@ -31,3 +31,29 @@ export const isAuthenticated = () => {
 export const getToken = () => {
   return localStorage.getItem('token');
 }; 
+
+// Rehydrate user information from the backend when only a token exists
+export const rehydrateUserInfo = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const existing = getUserInfo();
+    if (!token || existing) {
+      return existing;
+    }
+    // Lazy import to avoid potential circular dependency on build tools
+    const { apiService } = await import('../services/api');
+    const res = await apiService.authenticatedRequest('/users/me', { method: 'GET' });
+    if (!res.ok) {
+      return null;
+    }
+    const data = await res.json();
+    const user = data.data || data.user || data;
+    if (user) {
+      setUserInfo(user);
+    }
+    return user;
+  } catch (error) {
+    console.error('Failed to rehydrate user info:', error);
+    return null;
+  }
+};

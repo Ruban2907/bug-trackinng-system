@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAuthenticated } from '../utils/userUtils';
+import { isAuthenticated, rehydrateUserInfo } from '../utils/userUtils';
 import { toast } from 'react-toastify';
 
 const ProtectedRoute = ({ children }) => {
@@ -8,18 +8,17 @@ const ProtectedRoute = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkAuth = () => {
-      // Add a small delay to ensure authentication state is properly set
-      const timer = setTimeout(() => {
-        if (!isAuthenticated()) {
-          toast.error("Please login to access this page");
-          navigate("/login", { replace: true });
-          return;
-        }
-        setIsLoading(false);
-      }, 100); // Small delay to ensure state is set
-
-      return () => clearTimeout(timer);
+    const checkAuth = async () => {
+      // small delay to ensure storage writes complete
+      await new Promise(r => setTimeout(r, 80));
+      // Attempt to rehydrate if needed
+      await rehydrateUserInfo();
+      if (!isAuthenticated()) {
+        toast.error("Please login to access this page");
+        navigate("/login", { replace: true });
+        return;
+      }
+      setIsLoading(false);
     };
 
     checkAuth();

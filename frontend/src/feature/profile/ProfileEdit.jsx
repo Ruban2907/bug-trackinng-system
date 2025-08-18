@@ -81,14 +81,17 @@ const ProfileEdit = () => {
         body: formDataToSend
       });
 
-      const data = await response.json();
-
       if (response.ok) {
+        const data = await response.json();
+        
+        const updatedUserData = data.data || data;
+        
         const finalUserInfo = {
           ...userInfo,
           ...formData,
-          picture: data.foundUser?.picture || userInfo.picture
+          picture: updatedUserData.picture || userInfo.picture
         };
+        
         setUserInfo(finalUserInfo);
         setUserInfoState(finalUserInfo);
 

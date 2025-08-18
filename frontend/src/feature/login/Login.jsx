@@ -333,7 +333,7 @@ const LoginPage = () => {
 
         <div className="w-full md:flex-1 bg-gray-100 flex items-center justify-center order-2 md:order-none">
           <img
-            src="/public/forget.jpg"
+            src="/forget.jpg"
             alt="Sign in visual"
             className="object-cover w-full h-48 sm:h-64 md:h-full md:min-h-[300px]"
           />

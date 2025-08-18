@@ -1,8 +1,33 @@
 const Project = require("../model/project");
 const User = require("../model/user");
-const { successResponse, createdResponse, errorResponse, notFoundResponse, forbiddenResponse, validationErrorResponse } = require("../utils/responseHandler");
+const { successResponse, createdResponse } = require("../utils/responseHandler");
 const { ValidationError, AuthorizationError, NotFoundError } = require("../utils/errors");
 const { asyncHandler } = require("../middleware/errorHandler");
+
+const ADMIN_OR_MANAGER = ['admin', 'manager'];
+const QA_OR_DEVELOPER = ['qa', 'developer'];
+
+const getUserOrThrow = (req) => {
+  const user = req.user;
+  if (!user) throw new AuthorizationError("User not authenticated");
+  return user;
+};
+
+const requireManagerOrAdmin = (user, message) => {
+  if (!user || !ADMIN_OR_MANAGER.includes(user.role)) {
+    throw new AuthorizationError(message);
+  }
+};
+
+const validateIdOrThrow = (value, message) => {
+  if (!value) throw new ValidationError(message);
+};
+
+const findProjectOrThrow = async (projectId) => {
+  const project = await Project.findById(projectId);
+  if (!project) throw new NotFoundError("Project not found");
+  return project;
+};
 
 const serializeProject = (projectDoc) => {
   if (!projectDoc) return projectDoc;
@@ -57,7 +82,7 @@ const serializeProject = (projectDoc) => {
 
 const validateQAUsers = async (qaIds) => {
   if (!qaIds || qaIds.length === 0) return true;
-  
+
   for (const qaId of qaIds) {
     const qaUser = await User.findById(qaId);
     if (!qaUser || qaUser.role !== 'qa') {
@@ -69,7 +94,7 @@ const validateQAUsers = async (qaIds) => {
 
 const validateDeveloperUsers = async (developerIds) => {
   if (!developerIds || developerIds.length === 0) return true;
-  
+
   for (const devId of developerIds) {
     const devUser = await User.findById(devId);
     if (!devUser || devUser.role !== 'developer') {
@@ -79,21 +104,17 @@ const validateDeveloperUsers = async (developerIds) => {
   return true;
 };
 
-const populateProject = async (project) => {
-  return await project.populate([
-    { path: 'createdBy', select: 'firstname lastname email role' },
-    { path: 'qaAssigned', select: 'firstname lastname email role' },
-    { path: 'developersAssigned', select: 'firstname lastname email role' }
-  ]);
-};
+const populateProject = async (project) => project.populate([
+  { path: 'createdBy', select: 'firstname lastname email role' },
+  { path: 'qaAssigned', select: 'firstname lastname email role' },
+  { path: 'developersAssigned', select: 'firstname lastname email role' }
+]);
 
-const populateProjectWithPictures = async (project) => {
-  return await project.populate([
-    { path: 'createdBy', select: 'firstname lastname email role picture' },
-    { path: 'qaAssigned', select: 'firstname lastname email role picture' },
-    { path: 'developersAssigned', select: 'firstname lastname email role picture' }
-  ]);
-};
+const populateProjectWithPictures = async (project) => project.populate([
+  { path: 'createdBy', select: 'firstname lastname email role picture' },
+  { path: 'qaAssigned', select: 'firstname lastname email role picture' },
+  { path: 'developersAssigned', select: 'firstname lastname email role picture' }
+]);
 
 const validateImageFile = (file) => {
   if (!file.mimetype.startsWith('image/')) {
@@ -106,7 +127,7 @@ const validateImageFile = (file) => {
 
 const parseArrayField = (fieldValue) => {
   if (!fieldValue) return [];
-  
+
   try {
     return Array.isArray(fieldValue) ? fieldValue : JSON.parse(fieldValue);
   } catch (_) {
@@ -126,10 +147,8 @@ async function handleCreateProject(req, res) {
   const qaAssigned = parseArrayField(req.body.qaAssigned);
   const developersAssigned = parseArrayField(req.body.developersAssigned);
 
-  const currentUser = req.user;
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-    throw new AuthorizationError("Access denied: Only managers and admins can create projects");
-  }
+  const currentUser = getUserOrThrow(req);
+  requireManagerOrAdmin(currentUser, "Access denied: Only managers and admins can create projects");
 
   if (!name) {
     throw new ValidationError("Project name is required");
@@ -153,10 +172,7 @@ async function handleCreateProject(req, res) {
   if (req.file) {
     try {
       validateImageFile(req.file);
-      projectData.picture = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype,
-      };
+      projectData.picture = { data: req.file.buffer, contentType: req.file.mimetype };
     } catch (error) {
       throw new ValidationError(error.message);
     }
@@ -169,10 +185,8 @@ async function handleCreateProject(req, res) {
 }
 
 async function handleGetAllProjects(req, res) {
-  const currentUser = req.user;
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-    throw new AuthorizationError("Access denied: Only managers and admins can view all projects");
-  }
+  const currentUser = getUserOrThrow(req);
+  requireManagerOrAdmin(currentUser, "Access denied: Only managers and admins can view all projects");
 
   const projects = await Project.find()
     .populate('createdBy', 'firstname lastname email role')
@@ -186,9 +200,8 @@ async function handleGetAllProjects(req, res) {
 }
 
 async function handleGetAssignedProjects(req, res) {
-  const currentUser = req.user;
-  
-  if (!currentUser || !['qa', 'developer'].includes(currentUser.role)) {
+  const currentUser = getUserOrThrow(req);
+  if (!QA_OR_DEVELOPER.includes(currentUser.role)) {
     throw new AuthorizationError("Access denied: Only QA engineers and developers can access this endpoint");
   }
 
@@ -205,7 +218,7 @@ async function handleGetAssignedProjects(req, res) {
         if (!project.qaAssigned || project.qaAssigned.length === 0) {
           return false;
         }
-        
+
         return project.qaAssigned.some(qa => {
           const qaId = qa._id ? qa._id.toString() : qa.toString();
           const userId = currentUser._id.toString();
@@ -237,9 +250,7 @@ async function handleGetAssignedProjects(req, res) {
 async function handleGetProjectById(req, res) {
   const { projectId } = req.params;
 
-  if (!projectId) {
-    throw new ValidationError("Project ID is required");
-  }
+  validateIdOrThrow(projectId, "Project ID is required");
 
   const project = await Project.findById(projectId)
     .populate('createdBy', 'firstname lastname email role picture')
@@ -259,19 +270,12 @@ async function handleUpdateProject(req, res) {
   const qaAssigned = req.body.qaAssigned !== undefined ? parseArrayField(req.body.qaAssigned) : undefined;
   const developersAssigned = req.body.developersAssigned !== undefined ? parseArrayField(req.body.developersAssigned) : undefined;
 
-  const currentUser = req.user;
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-    throw new AuthorizationError("Access denied: Only managers and admins can update projects");
-  }
+  const currentUser = getUserOrThrow(req);
+  requireManagerOrAdmin(currentUser, "Access denied: Only managers and admins can update projects");
 
-  if (!projectId) {
-    throw new ValidationError("Project ID is required");
-  }
+  validateIdOrThrow(projectId, "Project ID is required");
 
-  const project = await Project.findById(projectId);
-  if (!project) {
-    throw new NotFoundError("Project not found");
-  }
+  const project = await findProjectOrThrow(projectId);
 
   if (qaAssigned && qaAssigned.length > 0) {
     await validateQAUsers(qaAssigned);
@@ -290,10 +294,7 @@ async function handleUpdateProject(req, res) {
   if (req.file) {
     try {
       validateImageFile(req.file);
-      project.picture = {
-        data: req.file.buffer,
-        contentType: req.file.mimetype,
-      };
+      project.picture = { data: req.file.buffer, contentType: req.file.mimetype };
     } catch (error) {
       throw new ValidationError(error.message);
     }
@@ -308,19 +309,12 @@ async function handleUpdateProject(req, res) {
 async function handleDeleteProject(req, res) {
   const { projectId } = req.params;
 
-  const currentUser = req.user;
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-    throw new AuthorizationError("Access denied: Only managers and admins can delete projects");
-  }
+  const currentUser = getUserOrThrow(req);
+  requireManagerOrAdmin(currentUser, "Access denied: Only managers and admins can delete projects");
 
-  if (!projectId) {
-    throw new ValidationError("Project ID is required");
-  }
+  validateIdOrThrow(projectId, "Project ID is required");
 
-  const project = await Project.findById(projectId);
-  if (!project) {
-    throw new NotFoundError("Project not found");
-  }
+  const project = await findProjectOrThrow(projectId);
 
   await Project.findByIdAndDelete(projectId);
 
@@ -331,23 +325,16 @@ async function handleAssignQA(req, res) {
   const { projectId } = req.params;
   const { qaIds } = req.body;
 
-  const currentUser = req.user;
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-    throw new AuthorizationError("Access denied: Only managers and admins can assign QA to projects");
-  }
+  const currentUser = getUserOrThrow(req);
+  requireManagerOrAdmin(currentUser, "Access denied: Only managers and admins can assign QA to projects");
 
-  if (!projectId) {
-    throw new ValidationError("Project ID is required");
-  }
+  validateIdOrThrow(projectId, "Project ID is required");
 
   if (!qaIds || !Array.isArray(qaIds) || qaIds.length === 0) {
     throw new ValidationError("QA IDs array is required and must not be empty");
   }
 
-  const project = await Project.findById(projectId);
-  if (!project) {
-    throw new NotFoundError("Project not found");
-  }
+  const project = await findProjectOrThrow(projectId);
 
   await validateQAUsers(qaIds);
 
@@ -362,23 +349,16 @@ async function handleAssignDevelopers(req, res) {
   const { projectId } = req.params;
   const { developerIds } = req.body;
 
-  const currentUser = req.user;
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
-    throw new AuthorizationError("Access denied: Only managers and admins can assign developers to projects");
-  }
+  const currentUser = getUserOrThrow(req);
+  requireManagerOrAdmin(currentUser, "Access denied: Only managers and admins can assign developers to projects");
 
-  if (!projectId) {
-    throw new ValidationError("Project ID is required");
-  }
+  validateIdOrThrow(projectId, "Project ID is required");
 
   if (!developerIds || !Array.isArray(developerIds) || developerIds.length === 0) {
     throw new ValidationError("Developer IDs array is required and must not be empty");
   }
 
-  const project = await Project.findById(projectId);
-  if (!project) {
-    throw new NotFoundError("Project not found");
-  }
+  const project = await findProjectOrThrow(projectId);
 
   checkQARequired(undefined, project.qaAssigned);
   await validateDeveloperUsers(developerIds);
