@@ -9,7 +9,8 @@ const {
   sanitizeStrings 
 } = require("../middleware/validation");
 
-const { handleUserlogin, handleUserSignup, handleForgotPassword, handleResetPassword } = require("../controller/auth");
+const { handleUserlogin, handleForgotPassword, handleResetPassword } = require("../controller/auth");
+const { handleCreateUser } = require("../controller/user");
 
 // Auth routes
 router.post("/signup", 
@@ -18,7 +19,7 @@ router.post("/signup",
   validateEmail,
   validateRole,
   sanitizeStrings(['firstname', 'lastname', 'email']),
-  handleUserSignup
+  handleCreateUser
 );
 
 router.post("/login", 

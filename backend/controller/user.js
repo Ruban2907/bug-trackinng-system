@@ -11,10 +11,12 @@ const {
   ConflictError,
 } = require("../utils/errors");
 const { asyncHandler } = require("../middleware/errorHandler");
-const { canManageRole } = require("../utils/helpers");
+const { canManageRole, sanitizeUser } = require("../utils/helpers");
+const { setUser } = require("../services/secret");
 
 const ADMIN_OR_MANAGER = ["admin", "manager"];
 const ADMIN_MANAGER_QA = ["admin", "manager", "qa"];
+const SIGNUP_ALLOWED_ROLES = ["admin", "manager"];
 
 const buildPictureData = (user) => {
   if (user && user.picture && user.picture.data) {
@@ -24,7 +26,7 @@ const buildPictureData = (user) => {
     };
   }
   return null;
-};
+};//ruban ahmed]29[
 
 const serializeUser = (user) => ({
   _id: user._id,
@@ -44,25 +46,39 @@ const ensureDbUser = async (maybeUser) => {
 };
 
 async function handleCreateUser(req, res) {
-  const { firstname, lastname, email, password, role } = req.body;
+  const hasActor = Boolean(req.user);
+  const actor = hasActor ? await ensureDbUser(req.user) : null;
 
-  const currentUser = await ensureDbUser(req.user);
-  if (!currentUser || !ADMIN_OR_MANAGER.includes(currentUser.role)) {
-    throw new AuthorizationError(
-      "Access denied: Only admins and managers can create user accounts"
-    );
+  const { firstname, lastname = "", email, password, role } = req.body || {};
+
+  if (!firstname || !email || !password) {
+    throw new ValidationError("First name, email, and password are required");
   }
 
-  if (!firstname || !email || !password || !role) {
-    throw new ValidationError(
-      "First name, email, password, and role are required"
-    );
-  }
+  let finalRole = role;
+  if (actor) {
+    if (!ADMIN_OR_MANAGER.includes(actor.role)) {
+      throw new AuthorizationError(
+        "Access denied: Only admins and managers can create user accounts"
+      );
+    }
 
-  if (!canManageRole(currentUser.role, role)) {
-    throw new AuthorizationError(
-      `Access denied: You cannot create ${role} users`
-    );
+    if (!finalRole) {
+      throw new ValidationError("Role is required when creating users");
+    }
+
+    if (!canManageRole(actor.role, finalRole)) {
+      throw new AuthorizationError(
+        `Access denied: You cannot create ${finalRole} users`
+      );
+    }
+  } else {
+    if (finalRole && !SIGNUP_ALLOWED_ROLES.includes(finalRole)) {
+      throw new ValidationError(
+        "Only admin and manager accounts can be created during signup."
+      );
+    }
+    finalRole = finalRole || "manager";
   }
 
   const existingUser = await User.findOne({ email });
@@ -73,10 +89,10 @@ async function handleCreateUser(req, res) {
   const hashpass = await bcrypt.hash(password, 10);
   const userData = {
     firstname,
-    lastname: lastname || "",
+    lastname,
     email,
     password: hashpass,
-    role,
+    role: finalRole,
   };
 
   if (req.file) {
@@ -88,11 +104,15 @@ async function handleCreateUser(req, res) {
 
   const newUser = await User.create(userData);
 
-  return createdResponse(
-    res,
-    "User created successfully",
-    serializeUser(newUser)
-  );
+  if (actor) {
+    // Admin/manager created user response
+    return createdResponse(res, "User created successfully", serializeUser(newUser));
+  }
+
+  // Public signup response with token
+  const token = setUser(newUser);
+  const userResponse = sanitizeUser(newUser);
+  return createdResponse(res, "User registered successfully", { token, foundUser: userResponse });
 }
 
 async function handleGetAllUsers(req, res) {

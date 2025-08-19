@@ -2,19 +2,11 @@ const User = require("../model/user");
 const { setUser } = require("../services/secret");
 const bcrypt = require('bcrypt');
 const { ValidationError, AuthenticationError } = require("../utils/errors");
-const { successResponse, createdResponse } = require("../utils/responseHandler");
+const { successResponse } = require("../utils/responseHandler");
 const { sanitizeUser } = require("../utils/helpers");
 const { asyncHandler } = require("../middleware/errorHandler");
 
-const SIGNUP_ALLOWED_ROLES = ['admin', 'manager'];
 const findUserByEmail = (email) => User.findOne({ email });
-const attachPictureIfExists = (file, target) => {
-  if (!file) return;
-  target.picture = {
-    data: file.buffer,
-    contentType: file.mimetype,
-  };
-};
 
 async function handleUserlogin(req, res) {
   const { email, password } = req.body;
@@ -37,32 +29,8 @@ async function handleUserlogin(req, res) {
   const userData = sanitizeUser(foundUser);
 
   return successResponse(res, 200, "User logged in", { token, foundUser: userData });
-} 
-
-async function handleUserSignup(req, res) {
-  const { firstname, lastname, email, password, role } = req.body;
-
-  if (role && !SIGNUP_ALLOWED_ROLES.includes(role)) {
-    throw new ValidationError("Only admin and manager accounts can be created during signup.");
-  }
-
-  const hashpass = await bcrypt.hash(password, 10);
-  const userData = {
-    firstname,
-    lastname,
-    email,
-    password: hashpass,
-    role: role || 'manager',
-  };
-
-  attachPictureIfExists(req.file, userData);
-
-  const newUser = await User.create(userData);
-  const token = setUser(newUser);
-  const userResponse = sanitizeUser(newUser);
-
-  return createdResponse(res, "User registered successfully", { token, foundUser: userResponse });
 }
+
 
 async function handleForgotPassword(req, res) {
   const { email } = req.body;
@@ -99,7 +67,6 @@ async function handleResetPassword(req, res) {
 
 module.exports = {
   handleUserlogin: asyncHandler(handleUserlogin),
-  handleUserSignup: asyncHandler(handleUserSignup),
   handleForgotPassword: asyncHandler(handleForgotPassword),
   handleResetPassword: asyncHandler(handleResetPassword),
 }
