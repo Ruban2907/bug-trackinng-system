@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { apiService } from '../../services/api';
+import { bugApiService } from '../services/api';
+
+import { projectApiService } from '../../projects/services/api';
 import { toast } from 'react-toastify';
 
 const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
@@ -41,7 +43,7 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
         return;
       }
       
-      const response = await apiService.authenticatedRequest(`/projects/${projectId}`);
+      const response = await projectApiService.getProjectById(projectId);
       if (response.ok) {
         const data = await response.json();
         setDevelopers(data.data?.developersAssigned || []);
@@ -99,7 +101,7 @@ const BugEditModal = ({ bug, onClose, onBugUpdated, isOpen }) => {
         formDataToSend.append('screenshot', screenshot);
       }
 
-      const response = await apiService.updateBug(bug._id, formDataToSend);
+      const response = await bugApiService.updateBug(bug._id, formDataToSend);
       const data = await response.json();
 
       if (response.ok) {

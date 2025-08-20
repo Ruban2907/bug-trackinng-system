@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import Layout from '../../shared/Layout';
-import { apiService } from '../../services/api';
+
+import { bugApiService } from '../../feature/bugs/services/api';
+import { projectApiService } from '../../feature/projects/services/api';
 import { toast } from 'react-toastify';
-import ProjectCard from '../../feature/projects/ProjectCard';
-import ProjectFormModal from '../../feature/projects/ProjectFormModal';
+import ProjectCard from '../../feature/projects/components/ProjectCard';
+import ProjectFormModal from '../../feature/projects/components/ProjectFormModal';
 import ConfirmationModal from '../../shared/ConfirmationModal';
 import { useNavigate } from 'react-router-dom';
 import { getUserInfo, rehydrateUserInfo } from '../../utils/userUtils';
@@ -68,12 +70,12 @@ const Projects = () => {
       let projectsRes;
       if (userInfo.role === 'admin' || userInfo.role === 'manager') {
         // Admin and managers can see all projects
-        projectsRes = await apiService.getProjects();
+        projectsRes = await projectApiService.getProjects();
 
         // Fetch only allowed roles with explicit filters to satisfy backend RBAC
         const [qaRes, devRes] = await Promise.all([
-          apiService.authenticatedRequest('/users?role=qa'),
-          apiService.authenticatedRequest('/users?role=developer')
+          projectApiService.getUsersByRole('qa'),
+          projectApiService.getUsersByRole('developer')
         ]);
 
         const qaData = await qaRes.json();
@@ -93,7 +95,7 @@ const Projects = () => {
         setUsers(Array.from(map.values()));
       } else if (userInfo.role === 'qa' || userInfo.role === 'developer') {
         // QA and developers should see only their assigned projects
-        projectsRes = await apiService.getAssignedProjects();
+        projectsRes = await projectApiService.getAssignedProjects();
         
         // QA and developer users don't need to fetch all users
         setUsers([]);
@@ -131,7 +133,7 @@ const Projects = () => {
     try {
       const bugsPromises = projectsList.map(async (project) => {
         try {
-          const bugsRes = await apiService.authenticatedRequest(`/bugs?projectId=${project._id}`);
+          const bugsRes = await bugApiService.getProjectBugs(project._id);
           if (bugsRes.ok) {
             const bugsData = await bugsRes.json();
             // Extract data from new response format
@@ -161,7 +163,7 @@ const Projects = () => {
         toast.error('Form data is required');
         return;
       }
-      const res = await apiService.createProject(formData);
+      const res = await projectApiService.createProject(formData);
       const data = await res.json();
 
       if (!res.ok) {
@@ -187,7 +189,7 @@ const Projects = () => {
         toast.error('Form data is required');
         return;
       }
-      const res = await apiService.updateProject(projectId, formData);
+      const res = await projectApiService.updateProject(projectId, formData);
       const data = await res.json();
 
       if (!res.ok) {
@@ -220,7 +222,7 @@ const Projects = () => {
 
     setDeletingProject(projectToDelete._id);
     try {
-      const res = await apiService.deleteProject(projectToDelete._id);
+      const res = await projectApiService.deleteProject(projectToDelete._id);
       const data = await res.json();
 
       if (!res.ok) {

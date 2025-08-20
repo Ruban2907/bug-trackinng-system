@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import ConfirmationModal from '../../shared/ConfirmationModal';
+import ConfirmationModal from '../../../shared/ConfirmationModal';
 import { toast } from 'react-toastify';
 
 const ProjectFormModal = ({ isOpen, onClose, onSubmit, project, qaUsers, developerUsers }) => {

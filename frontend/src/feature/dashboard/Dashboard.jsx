@@ -4,7 +4,9 @@ import { getUserInfo } from "../../utils/userUtils";
 import { toast } from 'react-toastify';
 import Layout from "../../shared/Layout";
 import ProfilePicture from "../../shared/ProfilePicture";
-import { apiService } from "../../services/api";
+
+import { bugApiService } from "../bugs/services/api";
+import { projectApiService } from "../projects/services/api";
 
 const DashboardPage = () => {
   const [userInfo, setUserInfo] = useState(null);
@@ -41,7 +43,7 @@ const DashboardPage = () => {
       setIsLoading(true);
 
       if (userInfo && (userInfo.role === 'admin' || userInfo.role === 'manager')) {
-        const projectsRes = await apiService.authenticatedRequest('/projects');
+        const projectsRes = await projectApiService.getProjects();
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json();
           // Extract data from new response format
@@ -54,7 +56,7 @@ const DashboardPage = () => {
       }
 
       if (userInfo && (userInfo.role === 'qa' || userInfo.role === 'developer')) {
-        const projectsRes = await apiService.authenticatedRequest('/projects/assigned-projects');
+        const projectsRes = await projectApiService.getAssignedProjects();
         if (projectsRes.ok) {
           const projectsData = await projectsRes.json();
           // Extract data from new response format
@@ -71,7 +73,7 @@ const DashboardPage = () => {
 
       if (userInfo.role === 'admin' || userInfo.role === 'manager') {
         // Admin and managers can see all bugs
-        const bugsRes = await apiService.authenticatedRequest('/bugs');
+        const bugsRes = await bugApiService.getBugs();
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
           // Extract data from new response format
@@ -79,7 +81,7 @@ const DashboardPage = () => {
         }
       } else if (userInfo.role === 'qa') {
         // QA users can only see bugs from projects they're assigned to
-        const bugsRes = await apiService.authenticatedRequest('/bugs');
+        const bugsRes = await bugApiService.getBugs();
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
           // Extract data from new response format
@@ -87,7 +89,7 @@ const DashboardPage = () => {
         }
       } else if (userInfo.role === 'developer') {
         // Developers can only see bugs assigned to them
-        const bugsRes = await apiService.authenticatedRequest('/bugs');
+        const bugsRes = await bugApiService.getBugs();
         if (bugsRes.ok) {
           const bugsData = await bugsRes.json();
           // Extract data from new response format

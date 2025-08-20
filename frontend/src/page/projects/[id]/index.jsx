@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../../../shared/Layout';
-import { apiService } from '../../../services/api';
+
+import { bugApiService } from '../../../feature/bugs/services/api';
+import { projectApiService } from '../../../feature/projects/services/api';
 import { toast } from 'react-toastify';
 import { getProjectPictureUrl } from '../../../utils/imageUtils';
-import BugEditModal from '../../../feature/bugs/BugEditModal';
+import BugEditModal from '../../../feature/bugs/components/BugEditModal';
 import ConfirmationModal from '../../../shared/ConfirmationModal';
-import BugCard from '../../../feature/bugs/BugCard';
+import BugCard from '../../../feature/bugs/components/BugCard';
 import { getUserInfo } from '../../../utils/userUtils';
 
 const ProjectDetails = () => {
@@ -39,7 +41,7 @@ const ProjectDetails = () => {
 
   const fetchProjectDetails = useCallback(async () => {
     try {
-      const response = await apiService.getProjectById(id);
+      const response = await projectApiService.getProjectById(id);
       const data = await response.json();
 
       if (response.ok) {
@@ -60,7 +62,7 @@ const ProjectDetails = () => {
 
   const fetchProjectBugs = useCallback(async () => {
     try {
-      const response = await apiService.authenticatedRequest(`/bugs?projectId=${id}`);
+      const response = await bugApiService.getProjectBugs(id);
       const data = await response.json();
 
       if (response.ok) {
@@ -100,7 +102,7 @@ const ProjectDetails = () => {
 
     setDeletingBug(bugToDelete._id);
     try {
-      const res = await apiService.deleteBug(bugToDelete._id);
+      const res = await bugApiService.deleteBug(bugToDelete._id);
       const data = await res.json();
 
       if (!res.ok) {
@@ -128,7 +130,7 @@ const ProjectDetails = () => {
 
   const handleStatusUpdate = async (bugId, newStatus) => {
     try {
-      const response = await apiService.updateBugStatus(bugId, newStatus);
+      const response = await bugApiService.updateBugStatus(bugId, newStatus);
       const data = await response.json();
 
       if (response.ok) {

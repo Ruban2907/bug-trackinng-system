@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getUserInfo } from '../../utils/userUtils';
+import { getUserInfo } from '../../../utils/userUtils';
 
 const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate }) => {
   const [showDetails, setShowDetails] = useState(false);
@@ -171,26 +171,44 @@ const BugCard = ({ bug, onEdit, onDelete, onStatusUpdate }) => {
                 </div>
               )}
 
-                             {/* Status Update */}
-               {canUpdateStatus && (
-                 <select
-                   value={bug.status}
-                   onChange={(e) => handleStatusUpdate(e.target.value)}
-                   className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                 >
-                   <option value="new">New</option>
-                   <option value="started">Started</option>
-                   {bug.type === 'bug' ? (
-                     <>
-                       <option value="resolved">Resolved</option>
-                     </>
-                   ) : (
-                     <>
-                       <option value="completed">Completed</option>
-                     </>
-                   )}
-                 </select>
-               )}
+                                                          {/* Status Update */}
+                {canUpdateStatus && (
+                  <select
+                    value={bug.status}
+                    onChange={(e) => handleStatusUpdate(e.target.value)}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {/* QA users only see 'new' status */}
+                    {userInfo.role === 'qa' && (
+                      <option value="new">New</option>
+                    )}
+                    
+                    {/* Developers see all statuses except 'new' */}
+                    {userInfo.role === 'developer' && (
+                      <>
+                        <option value="started">Started</option>
+                        {bug.type === 'bug' ? (
+                          <option value="resolved">Resolved</option>
+                        ) : (
+                          <option value="completed">Completed</option>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Admin/Manager see all statuses */}
+                    {(userInfo.role === 'admin' || userInfo.role === 'manager') && (
+                      <>
+                        <option value="new">New</option>
+                        <option value="started">Started</option>
+                        {bug.type === 'bug' ? (
+                          <option value="resolved">Resolved</option>
+                        ) : (
+                          <option value="completed">Completed</option>
+                        )}
+                      </>
+                    )}
+                  </select>
+                )}
 
               {/* Edit Button */}
               {canEdit && onEdit && (

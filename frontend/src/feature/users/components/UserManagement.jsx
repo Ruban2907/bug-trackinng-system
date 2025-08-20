@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserInfo } from '../../utils/userUtils';
+import { getUserInfo } from '../../../utils/userUtils';
 import { toast } from 'react-toastify';
 import RoleSelector from './RoleSelector';
 import UserList from './UserList';
 import CreateUserModal from './CreateUserModal';
-import { apiService } from '../../services/api';
+import { authApiService } from '../../login/services/api';
 
 const UserManagement = () => {
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ const UserManagement = () => {
     
     setIsLoading(true);
     try {
-      const response = await apiService.authenticatedRequest(`/users?role=${role}`, {
+      const response = await authApiService.authenticatedRequest(`/users?role=${role}`, {
         method: 'GET'
       });
 

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import ProfilePicture from '../../shared/ProfilePicture';
+import ProfilePicture from '../../../shared/ProfilePicture';
 import EditUserModal from './EditUserModal';
-import ConfirmationModal from '../../shared/ConfirmationModal';
+import ConfirmationModal from '../../../shared/ConfirmationModal';
 import { toast } from 'react-toastify';
-import { apiService } from '../../services/api';
+import { authApiService } from '../../login/services/api';
 
 const UserList = ({ users, role, isLoading, onUserUpdated, onUserDeleted, currentUser }) => {
   const [editingUser, setEditingUser] = useState(null);
@@ -25,7 +25,7 @@ const UserList = ({ users, role, isLoading, onUserUpdated, onUserDeleted, curren
 
     setDeletingUser(userToDelete._id);
     try {
-      const response = await apiService.authenticatedRequest(`/users/${userToDelete._id}`, {
+      const response = await authApiService.authenticatedRequest(`/users/${userToDelete._id}`, {
         method: 'DELETE'
       });
 

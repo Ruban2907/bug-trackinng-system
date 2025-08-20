@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getUserInfo, setUserInfo } from '../../utils/userUtils';
 import { toast } from 'react-toastify';
 import ProfilePicture from '../../shared/ProfilePicture';
-import { apiService } from '../../services/api';
+import { authApiService } from '../login/services/api';
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
@@ -76,7 +76,7 @@ const ProfileEdit = () => {
         formDataToSend.append('picture', newPicture);
       }
 
-      const response = await apiService.authenticatedRequest('/users/profile', {
+      const response = await authApiService.authenticatedRequest('/users/profile', {
         method: 'PATCH',
         body: formDataToSend
       });

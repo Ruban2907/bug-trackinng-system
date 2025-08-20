@@ -10,7 +10,7 @@ import MyProjects from './page/projects/my-projects/index';
 import Users from './page/users';
 import Bug from './page/bugs';
 import Profile from './page/profile';
-import NotFound from './feature/Error/Error';
+import NotFound from './feature/notFound/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../../shared/Layout';
-import { apiService } from '../../services/api';
+import Layout from '../../../shared/Layout';
+import { bugApiService } from '../services/api';
+
+import { projectApiService } from '../../projects/services/api';
 import { toast } from 'react-toastify';
-import { getUserInfo } from '../../utils/userUtils';
-import BugCreationFlow from '../../feature/bugs/BugCreationFlow';
-import BugCard from '../../feature/bugs/BugCard';
-import BugEditModal from '../../feature/bugs/BugEditModal';
-import ConfirmationModal from '../../shared/ConfirmationModal';
+import { getUserInfo } from '../../../utils/userUtils';
+import BugCreationFlow from './BugCreationFlow';
+import BugCard from './BugCard';
+import BugEditModal from './BugEditModal';
+import ConfirmationModal from '../../../shared/ConfirmationModal';
 
 const Bugs = () => {
   const [bugs, setBugs] = useState([]);
@@ -49,9 +51,9 @@ const Bugs = () => {
     try {
       let projectsRes;
       if (userInfo?.role === 'admin' || userInfo?.role === 'manager') {
-        projectsRes = await apiService.getProjects();
+        projectsRes = await projectApiService.getProjects();
       } else {
-        projectsRes = await apiService.getAssignedProjects();
+        projectsRes = await projectApiService.getAssignedProjects();
       }
 
       if (projectsRes.ok) {
@@ -81,7 +83,7 @@ const Bugs = () => {
     try {
       setIsLoading(true);
       console.log(`Fetching bugs for project: ${selectedProject || 'All Projects'}`);
-      const response = await apiService.getBugs(selectedProject);
+      const response = await bugApiService.getBugs(selectedProject);
       const data = await response.json();
 
       if (response.ok) {
@@ -124,7 +126,7 @@ const Bugs = () => {
 
   const handleStatusUpdate = async (bugId, newStatus) => {
     try {
-      const response = await apiService.updateBugStatus(bugId, newStatus);
+      const response = await bugApiService.updateBugStatus(bugId, newStatus);
       const data = await response.json();
 
       if (response.ok) {
@@ -151,7 +153,7 @@ const Bugs = () => {
 
     setDeletingBug(bugToDelete._id);
     try {
-      const response = await apiService.deleteBug(bugToDelete._id);
+      const response = await bugApiService.deleteBug(bugToDelete._id);
       const data = await response.json();
 
       if (response.ok) {

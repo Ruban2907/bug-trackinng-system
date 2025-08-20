@@ -41,8 +41,8 @@ export const rehydrateUserInfo = async () => {
       return existing;
     }
     // Lazy import to avoid potential circular dependency on build tools
-    const { apiService } = await import('../services/api');
-    const res = await apiService.authenticatedRequest('/users/me', { method: 'GET' });
+    const { authApiService } = await import('../feature/login/services/api');
+    const res = await authApiService.authenticatedRequest('/users/me', { method: 'GET' });
     if (!res.ok) {
       return null;
     }

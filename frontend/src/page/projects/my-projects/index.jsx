@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../../shared/Layout';
-import { apiService } from '../../../services/api';
+
+import { bugApiService } from '../../../feature/bugs/services/api';
+import { projectApiService } from '../../../feature/projects/services/api';
 import { toast } from 'react-toastify';
-import ProjectCard from '../../../feature/projects/ProjectCard';
-import BugEditModal from '../../../feature/bugs/BugEditModal';
-import BugCard from '../../../feature/bugs/BugCard';
+import ProjectCard from '../../../feature/projects/components/ProjectCard';
+import BugEditModal from '../../../feature/bugs/components/BugEditModal';
+import BugCard from '../../../feature/bugs/components/BugCard';
 import ConfirmationModal from '../../../shared/ConfirmationModal';
 import { getUserInfo } from '../../../utils/userUtils';
 import { useNavigate } from 'react-router-dom';
@@ -42,7 +44,7 @@ const MyProjects = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const projectsRes = await apiService.getAssignedProjects();
+      const projectsRes = await projectApiService.getAssignedProjects();
       if (!projectsRes.ok) {
         const errorData = await projectsRes.json();
         throw new Error(errorData.message || 'Failed to load projects');
@@ -65,7 +67,7 @@ const MyProjects = () => {
     try {
       const bugsPromises = projectsList.map(async (project) => {
         try {
-          const bugsRes = await apiService.authenticatedRequest(`/bugs?projectId=${project._id}`);
+          const bugsRes = await bugApiService.getProjectBugs(project._id);
           if (bugsRes.ok) {
             const bugsData = await bugsRes.json();
             // Extract data from new response format
@@ -136,7 +138,7 @@ const MyProjects = () => {
 
     setDeletingBug(bugToDelete._id);
     try {
-      const res = await apiService.deleteBug(bugToDelete._id);
+      const res = await bugApiService.deleteBug(bugToDelete._id);
       const data = await res.json();
 
       if (!res.ok) {
@@ -174,7 +176,7 @@ const MyProjects = () => {
 
   const handleStatusUpdate = async (bugId, newStatus) => {
     try {
-      const response = await apiService.updateBugStatus(bugId, newStatus);
+      const response = await bugApiService.updateBugStatus(bugId, newStatus);
       const data = await response.json();
 
       if (response.ok) {

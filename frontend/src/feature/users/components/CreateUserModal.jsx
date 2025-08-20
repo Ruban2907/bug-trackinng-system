@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { apiService } from '../../services/api';
-import ProfilePicture from '../../shared/ProfilePicture';
+import { authApiService } from '../../login/services/api';
+import ProfilePicture from '../../../shared/ProfilePicture';
 
-const EditUserModal = ({ user, onClose, onUserUpdated }) => {
+const CreateUserModal = ({ role, onClose, onUserCreated }) => {
   const [formData, setFormData] = useState({
-    firstname: user.firstname || '',
-    lastname: user.lastname || '',
-    email: user.email || '',
+    firstname: '',
+    lastname: '',
+    email: '',
     password: '',
     confirmPassword: ''
   });
   const [picture, setPicture] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showPasswordFields, setShowPasswordFields] = useState(false);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -55,19 +54,17 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
       toast.error('Email is required');
       return false;
     }
-    if (showPasswordFields) {
-      if (!formData.password) {
-        toast.error('Password is required when changing password');
-        return false;
-      }
-      if (formData.password.length < 6) {
-        toast.error('Password must be at least 6 characters long');
-        return false;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        toast.error('Passwords do not match');
-        return false;
-      }
+    if (!formData.password) {
+      toast.error('Password is required');
+      return false;
+    }
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return false;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return false;
     }
     return true;
   };
@@ -83,31 +80,28 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
       formDataToSend.append('firstname', formData.firstname.trim());
       formDataToSend.append('lastname', formData.lastname.trim());
       formDataToSend.append('email', formData.email.trim());
-
-      if (showPasswordFields && formData.password) {
-        formDataToSend.append('password', formData.password);
-      }
+      formDataToSend.append('password', formData.password);
+      formDataToSend.append('role', role);
 
       if (picture) {
         formDataToSend.append('picture', picture);
       }
 
-      const response = await apiService.authenticatedRequest(`/users/${user._id}`, {
-        method: 'PATCH',
+      const response = await authApiService.authenticatedRequest('/users', {
+        method: 'POST',
         body: formDataToSend
       });
 
       if (response.ok) {
         const data = await response.json();
-        onUserUpdated(data.data);
-        onClose();
+        onUserCreated(data.data);
       } else {
         const errorData = await response.json();
-        toast.error(errorData.message || 'Failed to update user');
+        toast.error(errorData.message || 'Failed to create user');
       }
     } catch (error) {
-      console.error('Error updating user:', error);
-      toast.error('Failed to update user');
+      console.error('Error creating user:', error);
+      toast.error('Failed to create user');
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +123,7 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">
-              Edit {getRoleDisplayName(user.role)}
+              Create New {getRoleDisplayName(role)}
             </h2>
             <button
               onClick={onClose}
@@ -144,10 +138,10 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Current Picture */}
+          {/* Picture Upload */}
           <div className="space-y-4">
             <label className="block text-sm font-medium text-gray-700">
-              Profile Picture
+              Profile Picture (Optional)
             </label>
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -158,7 +152,11 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
                     className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
                   />
                 ) : (
-                  <ProfilePicture user={user} size="lg" />
+                  <div className="w-16 h-16 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
                 )}
               </div>
               <input
@@ -168,11 +166,6 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
                 className="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
             </div>
-            {picture && (
-              <p className="text-sm text-green-600">
-                New picture selected: {picture.name}
-              </p>
-            )}
           </div>
 
           {/* Name Fields */}
@@ -219,67 +212,48 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
             />
           </div>
 
-          {/* Password Change Toggle */}
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="changePassword"
-              checked={showPasswordFields}
-              onChange={(e) => setShowPasswordFields(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <label htmlFor="changePassword" className="text-sm font-medium text-gray-700">
-              Change Password
-            </label>
-          </div>
-
-          {/* Password Fields (Conditional) */}
-          {showPasswordFields && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  New Password *
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required={showPasswordFields}
-                  minLength={6}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirm Password *
-                </label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required={showPasswordFields}
-                />
-              </div>
+          {/* Password Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password *
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                minLength={6}
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm Password *
+              </label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+          </div>
 
           {/* Role Display */}
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center space-x-2">
               <span className="text-sm font-medium text-gray-700">Role:</span>
-              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.role === 'manager' ? 'bg-purple-100 text-purple-800' :
-                  user.role === 'qa' ? 'bg-green-100 text-green-800' :
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${role === 'manager' ? 'bg-purple-100 text-purple-800' :
+                  role === 'qa' ? 'bg-green-100 text-green-800' :
                     'bg-blue-100 text-blue-800'
                 }`}>
-                {getRoleDisplayName(user.role)}
+                {getRoleDisplayName(role)}
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Role cannot be changed from this form
-            </p>
           </div>
 
           {/* Action Buttons */}
@@ -299,7 +273,7 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
                   : 'bg-blue-600 hover:bg-blue-700'
                 } transition-colors`}
             >
-              {isLoading ? 'Updating...' : 'Update User'}
+              {isLoading ? 'Creating...' : 'Create User'}
             </button>
           </div>
         </form>
@@ -308,4 +282,4 @@ const EditUserModal = ({ user, onClose, onUserUpdated }) => {
   );
 };
 
-export default EditUserModal;
+export default CreateUserModal;

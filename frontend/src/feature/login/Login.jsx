@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiService } from '../../services/api';
+import { authApiService } from './services/api';
 import { toast } from 'react-toastify';
 import { setUserInfo } from '../../utils/userUtils';
 
@@ -37,7 +37,7 @@ const LoginPage = () => {
     }
 
     try {
-      const response = await apiService.login(form);
+      const response = await authApiService.login(form);
       const responseData = await response.json();
 
       if (!response.ok) {
@@ -80,7 +80,7 @@ const LoginPage = () => {
     }
 
     try {
-      const response = await apiService.forgotPassword({ email: forgotEmail });
+      const response = await authApiService.forgotPassword({ email: forgotEmail });
       const responseData = await response.json();
 
       if (!response.ok) {
@@ -130,7 +130,7 @@ const LoginPage = () => {
     }
 
     try {
-      const response = await apiService.resetPassword({
+      const response = await authApiService.resetPassword({
         email: forgotEmail,
         newPassword: resetPassword
       });

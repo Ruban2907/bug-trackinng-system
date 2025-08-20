@@ -1,6 +1,6 @@
 import React from 'react';
 import Layout from '../../shared/Layout';
-import UserManagement from '../../feature/users/UserManagement';
+import UserManagement from '../../feature/users/components/UserManagement';
 
 const UsersPage = () => {
   return (

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { apiService } from '../../services/api';
+import { bugApiService } from '../services/api';
+
+import { projectApiService } from '../../projects/services/api';
 import { toast } from 'react-toastify';
-import { getUserInfo } from '../../utils/userUtils';
+import { getUserInfo } from '../../../utils/userUtils';
 
 const BugCreationFlow = ({ onClose, onBugCreated }) => {
   const [step, setStep] = useState('project-selection');
@@ -37,9 +39,9 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
       let projectsRes;
 
       if (userInfo?.role === 'admin' || userInfo?.role === 'manager') {
-        projectsRes = await apiService.getProjects();
+        projectsRes = await projectApiService.getProjects();
       } else {
-        projectsRes = await apiService.getAssignedProjects();
+        projectsRes = await projectApiService.getAssignedProjects();
       }
 
       if (projectsRes.ok) {
@@ -101,7 +103,7 @@ const BugCreationFlow = ({ onClose, onBugCreated }) => {
         formData.append('screenshot', screenshot);
       }
 
-      const response = await apiService.createBug(formData);
+      const response = await bugApiService.createBug(formData);
       const data = await response.json();
 
       if (response.ok) {
